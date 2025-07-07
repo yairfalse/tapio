@@ -93,6 +93,8 @@ jobs:
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-latest
+    # Only run on public repos or if GHAS is available
+    if: github.event.repository.private == false
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
