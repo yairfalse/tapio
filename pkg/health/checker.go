@@ -100,9 +100,10 @@ func (c *Checker) Check(ctx context.Context, namespace string) (*Report, error) 
 
 	for _, nsHealth := range namespaceMap {
 		report.Namespaces = append(report.Namespaces, *nsHealth)
-		if nsHealth.Status == StatusCritical {
+		switch nsHealth.Status {
+		case StatusCritical:
 			hasCritical = true
-		} else if nsHealth.Status == StatusWarning {
+		case StatusWarning:
 			hasWarning = true
 		}
 	}

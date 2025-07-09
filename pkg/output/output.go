@@ -36,25 +36,25 @@ func (o *Output) StopSpinner() {
 
 func (o *Output) Success(message string) {
 	green := color.New(color.FgGreen, color.Bold)
-	green.Print("✓ ")
+	_, _ = green.Print("[OK] ")
 	fmt.Println(message)
 }
 
 func (o *Output) Error(message string) {
 	red := color.New(color.FgRed, color.Bold)
-	red.Print("✗ ")
+	_, _ = red.Print("[ERROR] ")
 	fmt.Println(message)
 }
 
 func (o *Output) Warning(message string) {
 	yellow := color.New(color.FgYellow, color.Bold)
-	yellow.Print("⚠ ")
+	_, _ = yellow.Print("[WARN] ")
 	fmt.Println(message)
 }
 
 func (o *Output) Info(message string) {
 	blue := color.New(color.FgBlue)
-	blue.Print("ℹ ")
+	_, _ = blue.Print("[INFO] ")
 	fmt.Println(message)
 }
 
@@ -65,7 +65,7 @@ func (o *Output) EmptyLine() {
 func (o *Output) Header(title string) {
 	fmt.Println()
 	bold := color.New(color.Bold)
-	bold.Println(title)
+	_, _ = bold.Println(title) // Print error not critical for output formatting
 	fmt.Println(strings.Repeat("─", len(title)))
 }
 
@@ -111,19 +111,19 @@ func (o *Output) renderOverallHealth(report *health.Report) {
 	switch report.OverallStatus {
 	case health.StatusHealthy:
 		statusColor = color.New(color.FgGreen, color.Bold)
-		statusIcon = "✓"
+		statusIcon = "HEALTHY"
 	case health.StatusWarning:
 		statusColor = color.New(color.FgYellow, color.Bold)
-		statusIcon = "⚠"
+		statusIcon = "WARNING"
 	case health.StatusCritical:
 		statusColor = color.New(color.FgRed, color.Bold)
-		statusIcon = "✗"
+		statusIcon = "CRITICAL"
 	default:
 		statusColor = color.New(color.FgWhite)
-		statusIcon = "?"
+		statusIcon = "UNKNOWN"
 	}
 
-	fmt.Printf("Status: %s %s\n", statusIcon, statusColor.Sprint(report.OverallStatus))
+	fmt.Printf("Status: %s\n", statusColor.Sprint(statusIcon))
 	fmt.Printf("Checked at: %s\n", report.Timestamp.Format("15:04:05 MST"))
 	fmt.Printf("Total Pods: %d\n", report.TotalPods)
 	fmt.Printf("Healthy Pods: %d\n", report.HealthyPods)
@@ -150,8 +150,9 @@ func (o *Output) renderNamespaceHealth(ns health.NamespaceHealth) {
 	}
 
 	nameColor := color.New(color.Bold)
+	statusText := fmt.Sprintf("[%s]", strings.ToUpper(string(ns.Status)))
 	fmt.Printf("  %s %s (%d/%d pods healthy)\n",
-		statusColor.Sprint("●"),
+		statusColor.Sprint(statusText),
 		nameColor.Sprint(ns.Name),
 		ns.HealthyPods,
 		ns.TotalPods,
@@ -197,13 +198,13 @@ func (o *Output) renderIssue(issue health.Issue) {
 
 	switch issue.Severity {
 	case health.SeverityCritical:
-		icon = "✗"
+		icon = "[CRITICAL]"
 		iconColor = color.New(color.FgRed, color.Bold)
 	case health.SeverityWarning:
-		icon = "⚠"
+		icon = "[WARNING]"
 		iconColor = color.New(color.FgYellow, color.Bold)
 	case health.SeverityInfo:
-		icon = "ℹ"
+		icon = "[INFO]"
 		iconColor = color.New(color.FgBlue)
 	}
 

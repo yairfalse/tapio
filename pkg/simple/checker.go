@@ -29,23 +29,28 @@ func NewChecker() (*Checker, error) {
 	return &Checker{client: k8sClient.Clientset}, nil
 }
 
+// GetClient returns the Kubernetes client for direct access
+func (c *Checker) GetClient() kubernetes.Interface {
+	return c.client
+}
+
 // enhanceK8sError provides user-friendly error messages for common K8s issues
 func enhanceK8sError(err error) error {
 	errStr := err.Error()
 	
 	switch {
 	case strings.Contains(errStr, "connection refused"):
-		return fmt.Errorf("❌ Kubernetes cluster not running\n🔧 Try: minikube start, kind create cluster, or check your cluster status")
+		return fmt.Errorf("Kubernetes cluster not running\nTry: minikube start, kind create cluster, or check your cluster status")
 	case strings.Contains(errStr, "no such host"):
-		return fmt.Errorf("❌ Cannot reach Kubernetes API server\n🔧 Check your kubeconfig and network connectivity")
+		return fmt.Errorf("Cannot reach Kubernetes API server\nCheck your kubeconfig and network connectivity")
 	case strings.Contains(errStr, "couldn't get current server API group list"):
-		return fmt.Errorf("❌ Kubernetes API server unreachable\n🔧 Try: kubectl cluster-info or restart your cluster")
+		return fmt.Errorf("Kubernetes API server unreachable\nTry: kubectl cluster-info or restart your cluster")
 	case strings.Contains(errStr, "The connection to the server"):
-		return fmt.Errorf("❌ Kubernetes cluster connection failed\n🔧 Check if your cluster is running: kubectl get nodes")
+		return fmt.Errorf("Kubernetes cluster connection failed\nCheck if your cluster is running: kubectl get nodes")
 	case strings.Contains(errStr, "kubeconfig"):
-		return fmt.Errorf("❌ No valid kubeconfig found\n🔧 Try: kubectl config view or set KUBECONFIG environment variable")
+		return fmt.Errorf("No valid kubeconfig found\nTry: kubectl config view or set KUBECONFIG environment variable")
 	default:
-		return fmt.Errorf("❌ Kubernetes connection failed: %w\n🔧 Run 'kubectl cluster-info' to check cluster status", err)
+		return fmt.Errorf("Kubernetes connection failed: %w\nRun 'kubectl cluster-info' to check cluster status", err)
 	}
 }
 
@@ -56,7 +61,7 @@ func (c *Checker) Check(ctx context.Context, req *types.CheckRequest) (*types.Ch
 		namespace = "default" // TODO: Get from current context
 	}
 
-	pods, err := c.getPods(ctx, namespace, req.All)
+	pods, err := c.GetPods(ctx, namespace, req.All)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pods: %w", err)
 	}
@@ -209,12 +214,13 @@ func (c *Checker) getEmptyPodsMessage(namespace string, all bool, resource strin
 		namespace = "default"
 	}
 	
-	return fmt.Sprintf("No pods found in namespace '%s'. Try:\n🔧 kubectl get pods -n %s\n🔧 kubectl get pods --all-namespaces\n🔧 Deploy some workloads to test", namespace, namespace)
+	return fmt.Sprintf("No pods found in namespace '%s'. Try:\n- kubectl get pods -n %s\n- kubectl get pods --all-namespaces\n- Deploy some workloads to test", namespace, namespace)
 }
 
 // Helper functions
 
-func (c *Checker) getPods(ctx context.Context, namespace string, all bool) ([]corev1.Pod, error) {
+// GetPods retrieves pods from the specified namespace or all namespaces
+func (c *Checker) GetPods(ctx context.Context, namespace string, all bool) ([]corev1.Pod, error) {
 	listOptions := metav1.ListOptions{}
 
 	if all {
