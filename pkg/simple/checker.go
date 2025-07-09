@@ -35,6 +35,28 @@ func NewChecker() (*Checker, error) {
 	return &Checker{client: client}, nil
 }
 
+// GetClient returns the Kubernetes client for direct access
+func (c *Checker) GetClient() kubernetes.Interface {
+	return c.client
+}
+
+// getEmptyPodsMessage provides helpful context when no pods are found
+func (c *Checker) getEmptyPodsMessage(namespace string, all bool, resource string) string {
+	if resource != "" {
+		return fmt.Sprintf("No pods match resource '%s'. Try 'kubectl get pods --all-namespaces | grep %s'", resource, resource)
+	}
+	
+	if all {
+		return "No pods found in entire cluster. Try deploying some workloads or check if cluster is empty."
+	}
+	
+	if namespace == "" {
+		namespace = "default"
+	}
+	
+	return fmt.Sprintf("No pods found in namespace '%s'. Try:\nkubectl get pods -n %s\nkubectl get pods --all-namespaces\nDeploy some workloads to test", namespace, namespace)
+}
+
 // Check performs a health check based on the request
 func (c *Checker) Check(ctx context.Context, req *types.CheckRequest) (*types.CheckResult, error) {
 	namespace := req.Namespace
@@ -42,7 +64,7 @@ func (c *Checker) Check(ctx context.Context, req *types.CheckRequest) (*types.Ch
 		namespace = "default" // TODO: Get from current context
 	}
 
-	pods, err := c.getPods(ctx, namespace, req.All)
+	pods, err := c.GetPods(ctx, namespace, req.All)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pods: %w", err)
 	}
@@ -54,6 +76,16 @@ func (c *Checker) Check(ctx context.Context, req *types.CheckRequest) (*types.Ch
 
 	result := &types.CheckResult{
 		Timestamp: time.Now(),
+	}
+
+	// Handle empty pod list with helpful message
+	if len(pods) == 0 {
+		result.Problems = append(result.Problems, types.Problem{
+			Title:       "No pods found",
+			Description: c.getEmptyPodsMessage(namespace, req.All, req.Resource),
+			Severity:    types.SeverityWarning,
+		})
+		return result, nil
 	}
 
 	// Analyze each pod
@@ -144,7 +176,8 @@ func getKubeConfig() (*rest.Config, error) {
 	return kubeConfig.ClientConfig()
 }
 
-func (c *Checker) getPods(ctx context.Context, namespace string, all bool) ([]corev1.Pod, error) {
+// GetPods retrieves pods from the specified namespace
+func (c *Checker) GetPods(ctx context.Context, namespace string, all bool) ([]corev1.Pod, error) {
 	listOptions := metav1.ListOptions{}
 
 	if all {
