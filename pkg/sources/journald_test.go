@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yairfalse/tapio/pkg/correlation"
+	// "github.com/yairfalse/tapio/pkg/correlation" // TODO: Implement correlation package
 	"github.com/yairfalse/tapio/pkg/journald"
 )
 

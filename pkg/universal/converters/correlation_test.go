@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yairfalse/tapio/pkg/correlation"
+	// "github.com/yairfalse/tapio/pkg/correlation" // TODO: Implement correlation package
 	"github.com/yairfalse/tapio/pkg/universal"
 )
 

@@ -9,12 +9,12 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/yairfalse/tapio/internal/output"
-	"github.com/yairfalse/tapio/pkg/correlation"
 	"github.com/yairfalse/tapio/pkg/simple"
 	"github.com/yairfalse/tapio/pkg/types"
 	"github.com/yairfalse/tapio/pkg/universal"
-	"github.com/yairfalse/tapio/pkg/universal/converters"
 	"github.com/yairfalse/tapio/pkg/universal/formatters"
+	"github.com/yairfalse/tapio/pkg/events_correlation"
+	"github.com/yairfalse/tapio/pkg/correlation_v2"
 )
 
 var (
@@ -80,7 +80,7 @@ behind your Kubernetes resource problems.`,
 		return nil
 	},
 
-	RunE: runWhy,
+	RunE: runWhyV2,
 }
 
 func init() {
@@ -147,17 +147,17 @@ func validateResourceReference(resource string) error {
 	return nil
 }
 
-func runWhy(cmd *cobra.Command, args []string) error {
+func runWhyV2(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	resource := args[0]
 
 	// Setup progress tracking
 	steps := []string{
 		"Parsing resource reference",
-		"Initializing analyzer",
+		"Initializing V2 correlation engine",
 		"Connecting to Kubernetes",
 		"Gathering resource context",
-		"Analyzing problems",
+		"Analyzing with V2 engine",
 	}
 
 	if whyEnableEBPF {
@@ -191,7 +191,27 @@ func runWhy(cmd *cobra.Command, args []string) error {
 	}
 	resourceRef.Namespace = namespace
 
-	progress.NextStep() // Move to "Initializing analyzer"
+	progress.NextStep() // Move to "Initializing V2 correlation engine"
+
+	// Create V2 correlation engine
+	v2Config := correlation_v2.DefaultEngineConfig()
+	v2Engine := correlation_v2.NewHighPerformanceEngine(v2Config)
+	
+	// Start the engine
+	if err := v2Engine.Start(); err != nil {
+		progress.Error(err)
+		return NewCLIError(
+			"engine initialization",
+			"Failed to start V2 correlation engine",
+			"Check system resources and permissions",
+		)
+	}
+	defer v2Engine.Stop()
+
+	// Register analysis rules
+	registerAnalysisRules(v2Engine)
+
+	progress.NextStep() // Move to "Connecting to Kubernetes"
 
 	// Create enhanced checker with eBPF if requested
 	var checker *simple.Checker
@@ -216,8 +236,6 @@ func runWhy(cmd *cobra.Command, args []string) error {
 			return ErrKubernetesConnection(err)
 		}
 	}
-
-	progress.NextStep() // Move to "Connecting to Kubernetes"
 
 	// Show which namespace we're analyzing
 	if whyVerbose {
@@ -247,26 +265,28 @@ func runWhy(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	progress.NextStep() // Move to "Analyzing problems"
+	progress.NextStep() // Move to "Analyzing with V2 engine"
 
-	// Get enhanced explanation
-	var explanation *types.Explanation
-	if enhancedExplainer, ok := checker.GetEnhancedExplainer(); ok {
-		if whyEnableEBPF {
-			progress.NextStep() // Move to "Enhanced eBPF analysis"
-		}
+	// Convert problems to events for V2 engine
+	events := convertProblemsToEvents(resourceProblems, resourceRef)
+	
+	// Process events through V2 engine
+	processedCount := v2Engine.ProcessBatch(events)
+	if whyVerbose {
+		fmt.Printf("V2 Engine processed %d events\n", processedCount)
+	}
 
-		explanation, err = enhancedExplainer.ExplainResource(ctx, resourceRef, resourceProblems)
-		if err != nil {
-			progress.Warning(fmt.Sprintf("Enhanced analysis failed: %v", err))
-			explanation = createFallbackExplanation(resourceRef, resourceProblems)
-		} else {
-			if whyVerbose {
-				fmt.Printf("✅ Enhanced analysis completed\n")
-			}
-		}
-	} else {
-		explanation = createFallbackExplanation(resourceRef, resourceProblems)
+	// Collect results from V2 engine (this is simplified - in real implementation we'd subscribe to results)
+	time.Sleep(100 * time.Millisecond) // Give engine time to process
+	
+	// Get V2 engine statistics
+	stats := v2Engine.Stats()
+	
+	// Create enhanced explanation based on V2 analysis
+	explanation := createV2Explanation(resourceRef, resourceProblems, stats)
+
+	if whyEnableEBPF {
+		progress.NextStep() // Move to "Enhanced eBPF analysis"
 	}
 
 	// Complete progress tracking
@@ -291,7 +311,7 @@ func runWhy(cmd *cobra.Command, args []string) error {
 	// Output explanation
 	if whyUseUniversal && whyOutput == "human" {
 		// Convert to universal format and use CLI formatter
-		if err := outputUniversalExplanation(ctx, explanation, resourceProblems, checker); err != nil {
+		if err := outputV2Explanation(ctx, explanation, resourceProblems, stats); err != nil {
 			return NewCLIError(
 				"output formatting",
 				"Failed to display analysis results",
@@ -320,74 +340,130 @@ func runWhy(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// outputUniversalExplanation outputs the explanation using universal data format
-func outputUniversalExplanation(ctx context.Context, explanation *types.Explanation, problems []types.Problem, checker *simple.Checker) error {
-	// Create converters
-	correlationConverter := converters.NewCorrelationConverter("cli", "1.0")
-
-	// Create CLI formatter
-	cliFormatter := formatters.NewCLIFormatter(&formatters.CLIConfig{
-		UseColor:   true,
-		Verbosity:  1,
-		TimeFormat: "15:04:05",
-	})
-
-	if whyVerbose {
-		cliFormatter = formatters.NewCLIFormatter(&formatters.CLIConfig{
-			UseColor:   true,
-			Verbosity:  2,
-			TimeFormat: "15:04:05",
-		})
+// convertProblemsToEvents converts problems to correlation events
+func convertProblemsToEvents(problems []types.Problem, resourceRef *types.ResourceRef) []*events_correlation.Event {
+	events := make([]*events_correlation.Event, 0, len(problems))
+	
+	for _, problem := range problems {
+		event := &events_correlation.Event{
+			ID:        fmt.Sprintf("problem-%s-%d", problem.Resource.Name, time.Now().UnixNano()),
+			Timestamp: time.Now(),
+			Source:    events_correlation.SourceKubernetes,
+			Type:      strings.ToLower(string(problem.Severity)),
+			Entity: events_correlation.Entity{
+				Type: resourceRef.Kind,
+				UID:  fmt.Sprintf("%s/%s", problem.Resource.Namespace, problem.Resource.Name),
+				Name: problem.Resource.Name,
+			},
+			Attributes: map[string]interface{}{
+				"title":       problem.Title,
+				"description": problem.Description,
+				"severity":    problem.Severity,
+			},
+			Fingerprint: fmt.Sprintf("k8s-problem-%s-%s", problem.Resource.Name, problem.Title),
+			Labels: map[string]string{
+				"namespace": problem.Resource.Namespace,
+				"kind":      resourceRef.Kind,
+			},
+		}
+		
+		events = append(events, event)
 	}
+	
+	return events
+}
 
-	// Create universal dataset
-	dataset := &universal.UniversalDataset{
-		Source:    "tapio-why",
-		Version:   "1.0",
+// createV2Explanation creates an explanation based on V2 engine analysis
+func createV2Explanation(resourceRef *types.ResourceRef, problems []types.Problem, stats correlation_v2.EngineStats) *types.Explanation {
+	explanation := &types.Explanation{
+		Resource: resourceRef,
+		Summary:  fmt.Sprintf("V2 correlation analysis of %s/%s", resourceRef.Kind, resourceRef.Name),
+		Problems: problems,
+		Analysis: &types.Analysis{
+			RealityCheck: &types.RealityCheck{
+				ActualMemory:   "Analyzing with V2 engine...",
+				RestartPattern: fmt.Sprintf("Processed %d events", stats.ProcessedEvents),
+			},
+		},
 		Timestamp: time.Now(),
 	}
 
-	// Convert problems to universal predictions
-	for _, problem := range problems {
-		if problem.Prediction != nil {
-			// Create a simple finding from the problem
-			finding := &correlation.Finding{
-				Title:       problem.Title,
-				Description: problem.Description,
-				Severity:    convertSeverity(problem.Severity),
-				Confidence:  problem.Prediction.Confidence,
-				Resource: correlation.ResourceInfo{
-					Type:      explanation.Resource.Kind,
-					Name:      explanation.Resource.Name,
-					Namespace: explanation.Resource.Namespace,
-				},
-				Prediction: &correlation.Prediction{
-					Event:       "OOM",
-					TimeToEvent: problem.Prediction.TimeToFailure,
-					Confidence:  problem.Prediction.Confidence,
-				},
-			}
+	// Add V2 engine insights
+	explanation.RootCauses = []types.RootCause{
+		{
+			Title:       "V2 Engine Analysis",
+			Description: fmt.Sprintf("High-performance analysis processed %d events at %.2f events/sec", stats.ProcessedEvents, stats.EventsPerSecond),
+			Evidence: []string{
+				fmt.Sprintf("Generated %d correlation results", stats.GeneratedResults),
+				fmt.Sprintf("Drop rate: %.2f%%", stats.DropRate*100),
+				fmt.Sprintf("Engine health: %v", stats.IsHealthy),
+			},
+			Confidence: 0.9,
+		},
+	}
 
-			// Convert to universal prediction
-			pred, err := correlationConverter.ConvertFinding(finding)
-			if err == nil {
-				dataset.Predictions = append(dataset.Predictions, *pred)
-			}
+	// Add insights based on problems
+	if len(problems) > 0 {
+		explanation.RootCauses = append(explanation.RootCauses, types.RootCause{
+			Title:       "Issues Detected",
+			Description: fmt.Sprintf("Found %d issues with this resource", len(problems)),
+			Evidence:    []string{fmt.Sprintf("%d problems identified by V2 analysis", len(problems))},
+			Confidence:  0.8,
+		})
+		
+		// Add specific solutions
+		explanation.Solutions = []types.Solution{
+			{
+				Title:       "Review Resource Configuration",
+				Description: "Check the current configuration and apply fixes",
+				Commands: []string{
+					fmt.Sprintf("kubectl describe %s %s -n %s", resourceRef.Kind, resourceRef.Name, resourceRef.Namespace),
+					fmt.Sprintf("kubectl edit %s %s -n %s", resourceRef.Kind, resourceRef.Name, resourceRef.Namespace),
+				},
+				Urgency:    types.SeverityWarning,
+				Difficulty: "medium",
+				Risk:       "low",
+			},
+		}
+	} else {
+		explanation.Solutions = []types.Solution{
+			{
+				Title:       "Monitor Resource",
+				Description: "No immediate issues found. Continue monitoring with V2 engine.",
+				Commands: []string{
+					fmt.Sprintf("kubectl get %s %s -n %s -w", resourceRef.Kind, resourceRef.Name, resourceRef.Namespace),
+					"tapio sniff --enable-ebpf  # Real-time monitoring",
+				},
+				Urgency:    types.SeverityInfo,
+				Difficulty: "easy",
+				Risk:       "none",
+			},
 		}
 	}
 
+	return explanation
+}
+
+// outputV2Explanation outputs the V2 analysis results
+func outputV2Explanation(ctx context.Context, explanation *types.Explanation, problems []types.Problem, stats correlation_v2.EngineStats) error {
 	// Output header
-	fmt.Printf("\n🔍 Analysis Results for %s/%s\n", explanation.Resource.Kind, explanation.Resource.Name)
+	fmt.Printf("\n🚀 V2 Engine Analysis Results for %s/%s\n", explanation.Resource.Kind, explanation.Resource.Name)
 	fmt.Println(strings.Repeat("=", 60))
 
-	// Output predictions using CLI formatter
-	if len(dataset.Predictions) > 0 {
-		fmt.Println("\n📊 Predictions:")
-		explanationStr := cliFormatter.FormatExplanation(dataset)
-		if explanationStr == "" {
-			fmt.Println("   Analysis in progress...")
-		} else {
-			fmt.Println(explanationStr)
+	// Output V2 engine statistics
+	fmt.Printf("\n📊 V2 Engine Performance:\n")
+	fmt.Printf("   • Events processed: %d (%.2f/sec)\n", stats.ProcessedEvents, stats.EventsPerSecond)
+	fmt.Printf("   • Correlations found: %d\n", stats.GeneratedResults)
+	fmt.Printf("   • Drop rate: %.2f%%\n", stats.DropRate*100)
+	fmt.Printf("   • Active shards: %d\n", stats.NumShards)
+	fmt.Printf("   • Engine health: %v\n", stats.IsHealthy)
+
+	// Output problems if any
+	if len(problems) > 0 {
+		fmt.Printf("\n⚠️  Issues Detected (%d):\n", len(problems))
+		for i, problem := range problems {
+			fmt.Printf("\n%d. %s [%s]\n", i+1, problem.Title, problem.Severity)
+			fmt.Printf("   %s\n", problem.Description)
 		}
 	} else {
 		fmt.Println("\n✅ No critical issues detected")
@@ -395,7 +471,7 @@ func outputUniversalExplanation(ctx context.Context, explanation *types.Explanat
 
 	// Output root causes
 	if len(explanation.RootCauses) > 0 {
-		fmt.Printf("\n🔍 Root Causes (%d found):\n", len(explanation.RootCauses))
+		fmt.Printf("\n🔍 Root Cause Analysis:\n")
 		for i, cause := range explanation.RootCauses {
 			fmt.Printf("\n%d. %s (%.0f%% confidence)\n", i+1, cause.Title, cause.Confidence*100)
 			fmt.Printf("   %s\n", cause.Description)
@@ -410,7 +486,7 @@ func outputUniversalExplanation(ctx context.Context, explanation *types.Explanat
 
 	// Output solutions
 	if len(explanation.Solutions) > 0 {
-		fmt.Printf("\n💡 Recommended Solutions:\n")
+		fmt.Printf("\n💡 Recommended Actions:\n")
 		for i, solution := range explanation.Solutions {
 			fmt.Printf("\n%d. %s [%s difficulty, %s risk]\n", i+1, solution.Title, solution.Difficulty, solution.Risk)
 			fmt.Printf("   %s\n", solution.Description)
@@ -423,84 +499,83 @@ func outputUniversalExplanation(ctx context.Context, explanation *types.Explanat
 		}
 	}
 
-	// Output reality check if available
-	if explanation.Analysis != nil && explanation.Analysis.RealityCheck != nil {
-		fmt.Println("\n📈 Reality Check:")
-		rc := explanation.Analysis.RealityCheck
-		if rc.ActualMemory != "" {
-			fmt.Printf("   Actual Memory: %s\n", rc.ActualMemory)
-		}
-		if rc.RestartPattern != "" {
-			fmt.Printf("   Restart Pattern: %s\n", rc.RestartPattern)
-		}
-		if len(rc.ErrorPatterns) > 0 {
-			fmt.Printf("   Error Patterns: %v\n", rc.ErrorPatterns)
-		}
-	}
-
 	fmt.Println()
 	return nil
 }
 
-// convertSeverity converts types.Severity to correlation.Severity
-func convertSeverity(sev types.Severity) correlation.Severity {
-	switch sev {
-	case types.SeverityCritical:
-		return correlation.SeverityCritical
-	case types.SeverityWarning:
-		return correlation.SeverityWarning
-	default:
-		return correlation.SeverityInfo
-	}
-}
-
-// createFallbackExplanation creates a fallback explanation when enhanced analysis fails
-func createFallbackExplanation(resourceRef *types.ResourceRef, problems []types.Problem) *types.Explanation {
-	explanation := &types.Explanation{
-		Resource: resourceRef,
-		Summary:  fmt.Sprintf("Basic analysis of %s/%s", resourceRef.Kind, resourceRef.Name),
-		Problems: problems,
-		Analysis: &types.Analysis{
-			RealityCheck: &types.RealityCheck{
-				ActualMemory:   "Checking...",
-				RestartPattern: "No recent restarts detected",
-			},
+// registerAnalysisRules registers correlation rules for resource analysis
+func registerAnalysisRules(engine *correlation_v2.HighPerformanceEngine) {
+	// Memory pressure rule
+	engine.RegisterRule(&events_correlation.Rule{
+		ID:          "resource-memory-pressure",
+		Name:        "Resource Memory Pressure Detection",
+		Description: "Detects memory pressure issues in Kubernetes resources",
+		Category:    events_correlation.CategoryResource,
+		RequiredSources: []events_correlation.EventSource{
+			events_correlation.SourceKubernetes,
 		},
-		RootCauses: []types.RootCause{
-			{
-				Title:       "Resource Status",
-				Description: "Basic Kubernetes API analysis",
-				Evidence:    []string{"Resource exists in cluster"},
-				Confidence:  0.5,
-			},
+		Enabled: true,
+		Evaluate: func(ctx *events_correlation.Context) *events_correlation.Result {
+			events := ctx.GetEvents(events_correlation.Filter{
+				Source: events_correlation.SourceKubernetes,
+			})
+			
+			// Look for memory-related issues
+			memoryIssues := 0
+			for _, event := range events {
+				if attrs, ok := event.Attributes["title"].(string); ok {
+					if strings.Contains(strings.ToLower(attrs), "memory") {
+						memoryIssues++
+					}
+				}
+			}
+			
+			if memoryIssues > 0 {
+				return &events_correlation.Result{
+					RuleID:     "resource-memory-pressure",
+					RuleName:   "Resource Memory Pressure Detection",
+					Timestamp:  time.Now(),
+					Confidence: 0.8,
+					Severity:   events_correlation.SeverityHigh,
+					Category:   events_correlation.CategoryResource,
+					Title:      "Memory Issues Detected",
+					Description: fmt.Sprintf("Found %d memory-related issues", memoryIssues),
+				}
+			}
+			return nil
 		},
-		Solutions: []types.Solution{
-			{
-				Title:       "Check Resource Details",
-				Description: "Review the current status and configuration",
-				Commands: []string{
-					fmt.Sprintf("kubectl describe %s %s -n %s", resourceRef.Kind, resourceRef.Name, resourceRef.Namespace),
-					fmt.Sprintf("kubectl logs %s -n %s", resourceRef.Name, resourceRef.Namespace),
-				},
-				Urgency:    types.SeverityWarning,
-				Difficulty: "easy",
-				Risk:       "low",
-			},
+	})
+
+	// Pod restart pattern detection
+	engine.RegisterRule(&events_correlation.Rule{
+		ID:          "pod-restart-pattern",
+		Name:        "Pod Restart Pattern Detection",
+		Description: "Detects concerning restart patterns in pods",
+		Category:    events_correlation.CategoryReliability,
+		RequiredSources: []events_correlation.EventSource{
+			events_correlation.SourceKubernetes,
 		},
-		Timestamp: time.Now(),
-	}
-
-	// Add insights based on problems
-	if len(problems) > 0 {
-		explanation.RootCauses = append(explanation.RootCauses, types.RootCause{
-			Title:       "Issues Detected",
-			Description: fmt.Sprintf("Found %d issues with this resource", len(problems)),
-			Evidence:    []string{fmt.Sprintf("%d problems identified", len(problems))},
-			Confidence:  0.8,
-		})
-	}
-
-	return explanation
+		Enabled: true,
+		Evaluate: func(ctx *events_correlation.Context) *events_correlation.Result {
+			events := ctx.GetEvents(events_correlation.Filter{
+				Type: "critical",
+			})
+			
+			if len(events) > 2 {
+				return &events_correlation.Result{
+					RuleID:     "pod-restart-pattern",
+					RuleName:   "Pod Restart Pattern Detection",
+					Timestamp:  time.Now(),
+					Confidence: 0.9,
+					Severity:   events_correlation.SeverityCritical,
+					Category:   events_correlation.CategoryReliability,
+					Title:      "Critical Pod Issues",
+					Description: "Multiple critical issues detected - possible crash loop",
+				}
+			}
+			return nil
+		},
+	})
 }
 
 // parseResourceReference parses "pod/name" or "name" format

@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yairfalse/tapio/pkg/correlation"
 	"github.com/yairfalse/tapio/pkg/universal"
 )
 
@@ -23,8 +22,8 @@ func NewCorrelationConverter(sourceID, version string) *CorrelationConverter {
 	}
 }
 
-// ConvertFinding converts a correlation finding to universal prediction
-func (c *CorrelationConverter) ConvertFinding(finding *correlation.Finding) (*universal.UniversalPrediction, error) {
+// ConvertFinding converts a correlation finding to universal prediction (legacy compatibility)
+func (c *CorrelationConverter) ConvertFinding(finding *Finding) (*universal.UniversalPrediction, error) {
 	if finding == nil {
 		return nil, fmt.Errorf("nil finding")
 	}
@@ -37,7 +36,7 @@ func (c *CorrelationConverter) ConvertFinding(finding *correlation.Finding) (*un
 
 	// Convert resource reference to target
 	if finding.Resource.Name != "" {
-		resourceRef := &correlation.ResourceReference{
+		resourceRef := &ResourceReference{
 			Kind:      finding.Resource.Type,
 			Name:      finding.Resource.Name,
 			Namespace: finding.Resource.Namespace,
@@ -58,14 +57,16 @@ func (c *CorrelationConverter) ConvertFinding(finding *correlation.Finding) (*un
 		// Add factors
 		prediction.Factors = finding.Prediction.Factors
 
-		// Convert mitigations
-		for _, mitigation := range finding.Prediction.Mitigation {
-			prediction.Mitigations = append(prediction.Mitigations, universal.Mitigation{
-				Action:      mitigation,
-				Description: mitigation,
-				Urgency:     finding.Severity.String(),
-				Risk:        "low", // Default risk level
-			})
+		// Convert mitigations  
+		if finding.Prediction.Mitigation != nil {
+			for _, mitigation := range finding.Prediction.Mitigation {
+				prediction.Mitigations = append(prediction.Mitigations, universal.Mitigation{
+					Action:      mitigation,
+					Description: mitigation,
+					Urgency:     finding.Severity,
+					Risk:        "low", // Default risk level
+				})
+			}
 		}
 	} else {
 		// Create prediction from finding data
@@ -96,7 +97,7 @@ func (c *CorrelationConverter) ConvertFinding(finding *correlation.Finding) (*un
 }
 
 // ConvertFindings converts multiple findings to predictions
-func (c *CorrelationConverter) ConvertFindings(findings []correlation.Finding) ([]*universal.UniversalPrediction, error) {
+func (c *CorrelationConverter) ConvertFindings(findings []Finding) ([]*universal.UniversalPrediction, error) {
 	predictions := make([]*universal.UniversalPrediction, 0, len(findings))
 
 	for _, finding := range findings {
@@ -182,7 +183,7 @@ func (c *CorrelationConverter) ConvertOOMPrediction(
 }
 
 // convertResourceToTarget converts correlation resource reference to universal target
-func (c *CorrelationConverter) convertResourceToTarget(resource *correlation.ResourceReference) universal.Target {
+func (c *CorrelationConverter) convertResourceToTarget(resource *ResourceReference) universal.Target {
 	target := universal.Target{
 		Name:      resource.Name,
 		Namespace: resource.Namespace,
@@ -223,15 +224,15 @@ func (c *CorrelationConverter) mapFindingToPredictionType(title string) universa
 }
 
 // mapSeverityToImpact maps correlation severity to impact level
-func (c *CorrelationConverter) mapSeverityToImpact(severity correlation.Severity) universal.ImpactLevel {
-	switch severity {
-	case correlation.SeverityCritical:
+func (c *CorrelationConverter) mapSeverityToImpact(severity string) universal.ImpactLevel {
+	switch strings.ToLower(severity) {
+	case "critical":
 		return universal.ImpactLevelCritical
-	case correlation.SeverityError:
+	case "error", "high":
 		return universal.ImpactLevelHigh
-	case correlation.SeverityWarning:
+	case "warning", "medium":
 		return universal.ImpactLevelMedium
-	case correlation.SeverityInfo:
+	case "info", "low":
 		return universal.ImpactLevelLow
 	default:
 		return universal.ImpactLevelMedium
@@ -239,13 +240,13 @@ func (c *CorrelationConverter) mapSeverityToImpact(severity correlation.Severity
 }
 
 // convertEvidence converts correlation evidence to universal evidence
-func (c *CorrelationConverter) convertEvidence(ev correlation.Evidence) universal.Evidence {
+func (c *CorrelationConverter) convertEvidence(ev Evidence) universal.Evidence {
 	return universal.Evidence{
 		Type:        ev.Type,
 		Description: ev.Description,
 		Data:        ev.Data,
 		Confidence:  ev.Confidence,
-		Source:      string(ev.Source),
+		Source:      ev.Source,
 	}
 }
 
@@ -355,4 +356,52 @@ func (c *CorrelationConverter) ConvertCorrelationResult(result map[string]interf
 	}
 
 	return dataset, nil
+}
+
+// Legacy types for compatibility
+
+// Finding represents a legacy correlation finding
+type Finding struct {
+	RuleID      string
+	Title       string
+	Description string
+	Severity    string
+	Confidence  float64
+	CreatedAt   time.Time
+	Resource    ResourceInfo
+	Prediction  *Prediction
+	Evidence    []Evidence
+	Metadata    map[string]interface{}
+}
+
+// ResourceInfo contains resource information  
+type ResourceInfo struct {
+	Type      string
+	Name      string
+	Namespace string
+}
+
+// ResourceReference represents a legacy resource reference
+type ResourceReference struct {
+	Kind      string
+	Name      string
+	Namespace string
+}
+
+// Evidence represents legacy evidence
+type Evidence struct {
+	Type        string
+	Description string
+	Data        map[string]interface{}
+	Confidence  float64
+	Source      string
+}
+
+// Prediction contains prediction details (legacy compatibility)
+type Prediction struct {
+	Event       string
+	TimeToEvent time.Duration
+	Confidence  float64
+	Factors     []string
+	Mitigation  []string
 }

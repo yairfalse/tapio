@@ -58,10 +58,10 @@ func runSniff(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
 
-	// Create manager
+	// Create V2 manager with high-performance correlation engine
 	config := collector.DefaultManagerConfig()
 	config.CorrelationBatchSize = sniffBatchSize
-	manager := collector.NewSimpleManager(config)
+	manager := collector.NewManagerV2(config)
 
 	// Register collectors based on flags
 	if !sniffK8sOnly {
@@ -126,7 +126,7 @@ func runSniff(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func handleOutput(ctx context.Context, manager *collector.SimpleManager) {
+func handleOutput(ctx context.Context, manager *collector.ManagerV2) {
 	insights := manager.Insights()
 
 	for {
@@ -253,7 +253,7 @@ func outputPrometheus(insight collector.Insight) {
 	}
 }
 
-func reportHealth(ctx context.Context, manager *collector.SimpleManager) {
+func reportHealth(ctx context.Context, manager *collector.ManagerV2) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 

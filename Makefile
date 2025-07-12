@@ -174,6 +174,131 @@ pr-ready: fmt ci-check
 agent-check: ci-check ## Run quality checks for agent work
 	@echo "✅ Agent quality checks complete!"
 
+# ==========================================
+# Cleanup & Maintenance
+# ==========================================
+
+##@ Cleanup
+
+# Clean all artifacts
+clean: ## Clean all build artifacts and temporary files
+	@echo "🧹 Cleaning up..."
+	@rm -rf bin/ dist/ build/ *.out *.html *.xml *.txt *.json *.sarif
+	@go clean -cache -testcache -modcache
+	@echo "✅ Cleanup completed!"
+
+# Clean and rebuild
+rebuild: clean build ## Clean and rebuild everything
+	@echo "✅ Rebuild completed!"
+
+# ==========================================
+# Performance & Benchmarking
+# ==========================================
+
+##@ Performance
+
+# Run comprehensive benchmarks
+bench: ## Run all benchmarks with memory stats
+	@echo "🏃 Running benchmarks..."
+	@mkdir -p profiles
+	@$(GOTEST) -bench=. -benchmem -benchtime=5s -timeout=30m ./pkg/otel/benchmarks/...
+	@echo "✅ Benchmarks completed!"
+
+# Run benchmarks with CPU profiling
+bench-cpu: ## Run benchmarks with CPU profiling
+	@echo "🔥 Running CPU profiling benchmarks..."
+	@mkdir -p profiles
+	@$(GOTEST) -bench=BenchmarkTraceAggregateCreation -benchmem -cpuprofile=profiles/cpu.prof ./pkg/otel/benchmarks/...
+	@echo "📊 View profile: go tool pprof profiles/cpu.prof"
+
+# Run benchmarks with memory profiling
+bench-mem: ## Run benchmarks with memory profiling
+	@echo "🧠 Running memory profiling benchmarks..."
+	@mkdir -p profiles
+	@$(GOTEST) -bench=BenchmarkArenaSpanAllocation -benchmem -memprofile=profiles/mem.prof ./pkg/otel/benchmarks/...
+	@echo "📊 View profile: go tool pprof profiles/mem.prof"
+
+# Profile-Guided Optimization (PGO) workflow
+bench-pgo: ## Run complete PGO benchmark workflow
+	@echo "🎯 Running Profile-Guided Optimization workflow..."
+	@./scripts/benchmark-pgo.sh
+	@echo "✅ PGO workflow completed! Check profiles/ directory"
+
+# Compare benchmark results
+bench-compare: ## Compare benchmark results against baseline
+	@echo "📈 Comparing benchmark results..."
+	@if [ ! -f profiles/baseline.txt ]; then \
+		echo "❌ No baseline found. Run: make bench > profiles/baseline.txt"; \
+		exit 1; \
+	fi
+	@$(GOTEST) -bench=. -benchmem -benchtime=5s ./pkg/otel/benchmarks/... > profiles/current.txt
+	@echo "📊 Baseline vs Current comparison:"
+	@echo "Baseline results:"
+	@grep "^Benchmark" profiles/baseline.txt | head -5
+	@echo "Current results:"
+	@grep "^Benchmark" profiles/current.txt | head -5
+
+# Fuzzing tests for robustness
+fuzz: ## Run fuzzing tests for trace validation
+	@echo "🎲 Running fuzzing tests..."
+	@$(GOTEST) -fuzz=FuzzTraceAggregateCreation -fuzztime=30s ./pkg/otel/domain/...
+	@$(GOTEST) -fuzz=FuzzSpanAttributes -fuzztime=30s ./pkg/otel/domain/...
+	@$(GOTEST) -fuzz=FuzzBinaryEncoding -fuzztime=30s ./pkg/otel/domain/...
+	@echo "✅ Fuzzing tests completed!"
+
+# Performance regression check
+perf-check: ## Check for performance regressions
+	@echo "⚡ Checking for performance regressions..."
+	@if [ ! -f profiles/baseline.txt ]; then \
+		echo "❌ No baseline found. Creating baseline..."; \
+		$(GOTEST) -bench=. -benchmem -count=3 ./pkg/otel/benchmarks/... > profiles/baseline.txt; \
+		echo "✅ Baseline created at profiles/baseline.txt"; \
+		exit 0; \
+	fi
+	@$(GOTEST) -bench=. -benchmem -count=3 ./pkg/otel/benchmarks/... > profiles/current.txt
+	@echo "📊 Performance regression analysis saved to profiles/regression-check.txt"
+
+# Build with PGO if profile exists
+build-pgo: ## Build with Profile-Guided Optimization
+	@if [ -f profiles/default.pgo ] || [ -f pgo/default.pgo ]; then \
+		echo "🎯 Building with PGO..."; \
+		mkdir -p bin; \
+		PGO_FILE=$$(find profiles pgo -name "default.pgo" 2>/dev/null | head -1); \
+		$(GOBUILD) -pgo=$$PGO_FILE -ldflags "$(LDFLAGS)" -o bin/$(BINARY_NAME)-pgo ./cmd/tapio; \
+		echo "✅ PGO build completed: bin/$(BINARY_NAME)-pgo"; \
+	else \
+		echo "❌ No PGO profile found. Run: make bench-pgo"; \
+		exit 1; \
+	fi
+
+# ==========================================
+# Utilities
+# ==========================================
+
+##@ Utilities
+
+# Quick syntax check
+syntax-check: ## Quick syntax validation
+	@$(GOCMD) build -o /dev/null ./...
+
+# Module verification
+mod-verify: ## Verify and tidy modules
+	@$(GOMOD) verify
+	@$(GOMOD) tidy
+
+# Show build info
+info: ## Show build information
+	@echo "📋 Build Information:"
+	@echo "  Version: $(VERSION)"
+	@echo "  Git Commit: $(GIT_COMMIT)"
+	@echo "  Build Date: $(BUILD_DATE)"
+	@echo "  Platform: $(PLATFORM)/$(ARCH)"
+	@echo "  Go Version: $$(go version)"
+
+# ==========================================
+# Help System
+# ==========================================
+
 ##@ Help
 
 # Show help

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/yairfalse/tapio/pkg/collectors"
-	"github.com/yairfalse/tapio/pkg/correlation"
+	// "github.com/yairfalse/tapio/pkg/correlation" // TODO: Implement correlation package
 )
 
 // EBPFSource implements eBPF-based data collection with platform detection
