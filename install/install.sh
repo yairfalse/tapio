@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 TAPIO_VERSION=${TAPIO_VERSION:-latest}
 INSTALL_DIR=${INSTALL_DIR:-/usr/local/bin}
 CONFIG_DIR=${CONFIG_DIR:-$HOME/.tapio}
-REPO_URL="https://github.com/falseyair/tapio"
+REPO_URL="https://github.com/yairfalse/tapio"
 BINARY_NAME="tapio"
 
 # Platform detection
@@ -127,11 +127,17 @@ get_latest_version() {
     if [[ "$TAPIO_VERSION" == "latest" ]]; then
         debug "Fetching latest version from GitHub..."
         if command_exists curl; then
-            TAPIO_VERSION=$(curl -sSL "https://api.github.com/repos/falseyair/tapio/releases/latest" | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
+            TAPIO_VERSION=$(curl -sSL "https://api.github.com/repos/yairfalse/tapio/releases/latest" | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
         elif command_exists wget; then
-            TAPIO_VERSION=$(wget -qO- "https://api.github.com/repos/falseyair/tapio/releases/latest" | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
+            TAPIO_VERSION=$(wget -qO- "https://api.github.com/repos/yairfalse/tapio/releases/latest" | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
         else
             warn "Neither curl nor wget found, using development version"
+            TAPIO_VERSION="main"
+        fi
+        
+        # If no version was found (empty string), use development version
+        if [[ -z "$TAPIO_VERSION" ]]; then
+            warn "No releases found, using development version"
             TAPIO_VERSION="main"
         fi
     fi
@@ -153,7 +159,7 @@ install_binary() {
 }
 
 install_from_release() {
-    local download_url="https://github.com/falseyair/tapio/releases/download/${TAPIO_VERSION}/tapio_${TAPIO_VERSION#v}_${OS}_${ARCH}.tar.gz"
+    local download_url="https://github.com/yairfalse/tapio/releases/download/${TAPIO_VERSION}/tapio_${TAPIO_VERSION#v}_${OS}_${ARCH}.tar.gz"
     local temp_dir=$(mktemp -d)
     
     debug "Download URL: $download_url"
@@ -183,7 +189,10 @@ install_from_release() {
 
 install_from_source() {
     # Check if we're in the tapio directory and have a pre-built binary
-    if [[ -f "$(dirname "$0")/tapio" ]]; then
+    if [[ -f "$(dirname "$0")/../tapio" ]]; then
+        log "Using pre-built binary from project root..."
+        local binary_path="$(dirname "$0")/../tapio"
+    elif [[ -f "$(dirname "$0")/tapio" ]]; then
         log "Using pre-built binary..."
         local binary_path="$(dirname "$0")/tapio"
     else
@@ -280,7 +289,7 @@ show_next_steps() {
         
         if [[ "$HELM_AVAILABLE" == "true" ]]; then
             echo "  Install Tapio in-cluster with Helm:"
-            echo "    helm install tapio oci://ghcr.io/falseyair/tapio/chart"
+            echo "    helm install tapio oci://ghcr.io/yairfalse/tapio/chart"
             echo
         fi
         
@@ -301,7 +310,7 @@ show_next_steps() {
     echo "    tapio help                     # Show all commands"
     echo "    tapio docs                     # Open documentation"
     echo
-    echo "  Questions? Visit: https://github.com/falseyair/tapio"
+    echo "  Questions? Visit: https://github.com/yairfalse/tapio"
 }
 
 # Main installation flow
