@@ -33,6 +33,7 @@ Level 4: pkg/interfaces/      # All above
 3. **MUST TEST:** `go test ./...` must pass
 4. **NO STUBS:** No "TODO", "not implemented", empty functions
 5. **SHOW PROOF:** Paste build/test output or FAIL
+6.
 
 ### Quality Standards
 
@@ -40,6 +41,8 @@ Level 4: pkg/interfaces/      # All above
 - **No `map[string]interface{}`** in public APIs
 - **No `interface{}`** abuse
 - **Proper error handling** with context
+- **NO Stubs, no shortcuts**
+- **YOU work on a dedicated branch**
 
 ### Verification (MANDATORY)
 
@@ -53,14 +56,8 @@ go mod verify
 ```
 
 ## 🔧 Current Priorities
+- Getting the whole thing to work
 
-### Q3 2025 Focus
-
-1. **CNI Plugin** - Network correlation
-2. **Database Collectors** - PostgreSQL, MySQL
-3. **DataDog Integration** - Enterprise revenue
-4. **CDEvents Plugin** - CI/CD correlation
-5. **Parca Integration** - Continuous profiling
 
 ### Success Metrics
 
