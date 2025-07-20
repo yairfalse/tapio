@@ -207,7 +207,6 @@ func (p *eventProcessor) calculateConfidence(raw core.RawEvent) float64 {
 func (p *eventProcessor) createEntityContext(raw core.RawEvent) *domain.EntityContext {
 	return &domain.EntityContext{
 		Type: "SystemdUnit",
-		ID:   raw.UnitName,
 		Name: raw.UnitName,
 		Labels: map[string]string{
 			"unit_type": raw.UnitType,
@@ -466,7 +465,7 @@ func (p *eventProcessor) estimateAffectedUsers(raw core.RawEvent) int {
 func (p *eventProcessor) mapEventTypeToDomain(raw core.RawEvent) domain.EventType {
 	// Systemd events are typically service or system events
 	if raw.Type == core.EventTypeFailure || raw.ExitCode != 0 {
-		return domain.EventTypeError
+		return domain.EventTypeSystem
 	}
 	
 	// Most systemd events are service-related
