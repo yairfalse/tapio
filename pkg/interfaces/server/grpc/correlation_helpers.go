@@ -295,7 +295,6 @@ func (s *CorrelationServer) enrichSemanticGroupsWithAnalysis(ctx context.Context
 				"pattern":   "connection_timeout",
 				"frequency": 5,
 			})
-
 			group.RootCause = &pb.RootCauseAnalysis{
 				RootCauseSummary: "Configuration change triggered cascade",
 				CausalFactors: []*pb.CausalFactor{
@@ -596,7 +595,6 @@ func (s *CorrelationServer) convertRootCauseAnalysisToProto(rootCause *corrDomai
 		"pattern": "primary_root_cause",
 		"source":  "system_analysis",
 	})
-
 	return &pb.RootCauseAnalysis{
 		RootCauseSummary: "Primary root cause identified",
 		CausalFactors: []*pb.CausalFactor{
