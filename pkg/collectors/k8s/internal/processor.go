@@ -98,7 +98,7 @@ func (p *eventProcessor) createEntityContext(raw core.RawEvent) *domain.EntityCo
 	// Extract labels and UID from the object if available
 	var labels map[string]string
 	var uid string
-	
+
 	if obj, ok := raw.Object.(metav1.Object); ok {
 		labels = obj.GetLabels()
 		uid = string(obj.GetUID())
@@ -137,7 +137,7 @@ func (p *eventProcessor) createKubernetesData(raw core.RawEvent) *domain.Kuberne
 	// Extract labels and annotations from the object if available
 	var labels, annotations map[string]string
 	var resourceVersion string
-	
+
 	if obj, ok := raw.Object.(metav1.Object); ok {
 		labels = obj.GetLabels()
 		annotations = obj.GetAnnotations()
@@ -187,7 +187,7 @@ func (p *eventProcessor) extractMessageAndReason(raw core.RawEvent) (string, str
 			}
 		}
 	}
-	
+
 	return fmt.Sprintf("%s %s: %s", raw.ResourceKind, raw.Name, string(raw.Type)), string(raw.Type), "Normal"
 }
 
@@ -244,7 +244,7 @@ func (p *eventProcessor) determineSemanticIntent(raw core.RawEvent) string {
 		}
 		return "k8s-event"
 	}
-	
+
 	return fmt.Sprintf("%s-%s", raw.ResourceKind, string(raw.Type))
 }
 
@@ -257,7 +257,7 @@ func (p *eventProcessor) determineSemanticCategory(raw core.RawEvent) string {
 		case corev1.EventTypeNormal:
 			return "operations"
 		}
-		
+
 		switch event.Reason {
 		case "Failed", "FailedCreate", "FailedDelete", "FailedScheduling":
 			return "reliability"
@@ -267,7 +267,7 @@ func (p *eventProcessor) determineSemanticCategory(raw core.RawEvent) string {
 			return "performance"
 		}
 	}
-	
+
 	switch raw.Type {
 	case core.EventTypeError:
 		return "reliability"
@@ -281,11 +281,11 @@ func (p *eventProcessor) determineSemanticCategory(raw core.RawEvent) string {
 // generateSemanticTags generates semantic tags for correlation
 func (p *eventProcessor) generateSemanticTags(raw core.RawEvent) []string {
 	tags := []string{"kubernetes", raw.ResourceKind}
-	
+
 	if raw.Namespace != "" {
 		tags = append(tags, "namespaced")
 	}
-	
+
 	// Add resource-specific tags
 	switch raw.ResourceKind {
 	case "Pod":
@@ -297,7 +297,7 @@ func (p *eventProcessor) generateSemanticTags(raw core.RawEvent) []string {
 	case "Event":
 		tags = append(tags, "observability", "audit")
 	}
-	
+
 	// Add event type tags
 	switch raw.Type {
 	case core.EventTypeError:
@@ -305,7 +305,7 @@ func (p *eventProcessor) generateSemanticTags(raw core.RawEvent) []string {
 	case core.EventTypeDeleted:
 		tags = append(tags, "lifecycle", "cleanup")
 	}
-	
+
 	return tags
 }
 
@@ -331,7 +331,7 @@ func (p *eventProcessor) calculateSemanticConfidence(raw core.RawEvent) float64 
 // calculateBusinessImpact calculates business impact score
 func (p *eventProcessor) calculateBusinessImpact(raw core.RawEvent, severity string) float64 {
 	base := 0.1
-	
+
 	// Adjust based on severity
 	switch severity {
 	case "critical":
@@ -343,7 +343,7 @@ func (p *eventProcessor) calculateBusinessImpact(raw core.RawEvent, severity str
 	case "info":
 		base = 0.1
 	}
-	
+
 	// Adjust based on resource type
 	switch raw.ResourceKind {
 	case "Node":
@@ -356,18 +356,18 @@ func (p *eventProcessor) calculateBusinessImpact(raw core.RawEvent, severity str
 			base += 0.2
 		}
 	}
-	
+
 	if base > 1.0 {
 		base = 1.0
 	}
-	
+
 	return base
 }
 
 // determineAffectedServices determines which services might be affected
 func (p *eventProcessor) determineAffectedServices(raw core.RawEvent) []string {
 	services := []string{}
-	
+
 	switch raw.ResourceKind {
 	case "Node":
 		services = append(services, "cluster-scheduler", "node-management")
@@ -380,7 +380,7 @@ func (p *eventProcessor) determineAffectedServices(raw core.RawEvent) []string {
 	case "Service":
 		services = append(services, "service-discovery", "networking")
 	}
-	
+
 	return services
 }
 
@@ -390,17 +390,17 @@ func (p *eventProcessor) isCustomerFacing(raw core.RawEvent) bool {
 	if raw.Namespace == "kube-system" || raw.Namespace == "kube-public" || raw.Namespace == "kube-node-lease" {
 		return false
 	}
-	
+
 	// Services are often customer-facing
 	if raw.ResourceKind == "Service" {
 		return true
 	}
-	
+
 	// Pod failures in application namespaces affect customers
 	if raw.ResourceKind == "Pod" && raw.Type == core.EventTypeError {
 		return true
 	}
-	
+
 	return false
 }
 
