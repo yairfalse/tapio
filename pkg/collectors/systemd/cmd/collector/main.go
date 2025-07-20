@@ -13,6 +13,7 @@ import (
 
 	"github.com/yairfalse/tapio/pkg/collectors/systemd"
 	"github.com/yairfalse/tapio/pkg/collectors/systemd/internal"
+	"github.com/yairfalse/tapio/pkg/domain"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -130,7 +131,16 @@ func main() {
 
 			// Send event to Tapio server if connected
 			if grpcClient != nil && grpcClient.IsConnected() {
-				if err := grpcClient.SendEvent(ctx, event); err != nil {
+				// Convert UnifiedEvent to legacy Event for grpcClient
+				legacyEvent := domain.Event{
+					ID:        domain.EventID(event.ID),
+					Type:      event.Type,
+					Source:    domain.SourceType(event.Source),
+					Timestamp: event.Timestamp,
+					Severity:  domain.EventSeverity(event.Impact.Severity),
+					Data:      event.Application.Custom,
+				}
+				if err := grpcClient.SendEvent(ctx, legacyEvent); err != nil {
 					fmt.Printf("Failed to send event to server: %v\n", err)
 				}
 			}
@@ -141,15 +151,16 @@ func main() {
 				fmt.Printf("  ID: %s\n", event.ID)
 				fmt.Printf("  Type: %s\n", event.Type)
 				fmt.Printf("  Source: %s\n", event.Source)
-				fmt.Printf("  Severity: %s\n", event.Severity)
+				fmt.Printf("  Severity: %s\n", event.Impact.Severity)
 
 				// Print systemd-specific payload information
-				if eventData, ok := event.Data.(map[string]interface{}); ok {
-					if serviceName, ok := eventData["service_name"].(string); ok {
+				if event.Application != nil && event.Application.Custom != nil {
+					eventData := event.Application.Custom
+					if serviceName, ok := eventData["unit_name"].(string); ok {
 						fmt.Printf("  Service: %s\n", serviceName)
 					}
-					if eventType, ok := eventData["event_type"].(string); ok {
-						fmt.Printf("  Event Type: %s\n", eventType)
+					if event.Semantic != nil {
+						fmt.Printf("  Intent: %s\n", event.Semantic.Intent)
 					}
 
 					oldState, hasOld := eventData["old_state"].(string)

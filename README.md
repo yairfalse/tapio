@@ -45,16 +45,7 @@ User Request → API Error → Database Timeout → Pod OOMKill → Memory Leak 
 🔄 **Event Collectors** - eBPF, Kubernetes, SystemD data sources  
 🔄 **Performance Optimization** - Targeting high-throughput processing  
 🔄 **Cross-Layer Correlation** - Linking events from kernel to application  
-🔄 **Developer Experience** - Making it easy to run and test  
-
-**What we haven't built yet:**
-
-❌ Full production deployment  
-❌ Complete end-to-end correlation  
-❌ Business impact assessment  
-❌ Automated remediation  
-❌ UI/Dashboard  
-❌ Distributed deployment
+🔄 **Developer Experience** - Making it easy to run and test
 
 ## 🎯 Our Vision
 
