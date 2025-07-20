@@ -219,8 +219,8 @@ correlation:
 *This is our goal for what end-to-end correlation might look like:*
 
 ```bash
-# Future vision of tapio-cli
-$ tapio-cli correlate --trace-id abc123
+# Future vision of tapio commands
+$ tapio correlate --trace-id abc123
 
 CORRELATION SUMMARY
 ═══════════════════

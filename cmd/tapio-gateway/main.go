@@ -16,8 +16,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
-
-	pb "github.com/yairfalse/tapio/proto/gen/tapio/v1"
+	// pb "github.com/yairfalse/tapio/proto/gen/tapio/v1" // Disabled until proto files exist
 )
 
 var (
@@ -82,32 +81,33 @@ func runGateway(ctx context.Context, logger *zap.Logger) error {
 	)
 
 	// Register gRPC service handlers
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	// opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 
+	// TODO: Re-enable when proto files are generated
 	// Register TapioService
-	if err := pb.RegisterTapioServiceHandlerFromEndpoint(ctx, gwmux, *grpcServerEndpoint, opts); err != nil {
-		return fmt.Errorf("failed to register TapioService: %w", err)
-	}
+	// if err := pb.RegisterTapioServiceHandlerFromEndpoint(ctx, gwmux, *grpcServerEndpoint, opts); err != nil {
+	//	return fmt.Errorf("failed to register TapioService: %w", err)
+	// }
 
 	// Register CollectorService
-	if err := pb.RegisterCollectorServiceHandlerFromEndpoint(ctx, gwmux, *grpcServerEndpoint, opts); err != nil {
-		return fmt.Errorf("failed to register CollectorService: %w", err)
-	}
+	// if err := pb.RegisterCollectorServiceHandlerFromEndpoint(ctx, gwmux, *grpcServerEndpoint, opts); err != nil {
+	//	return fmt.Errorf("failed to register CollectorService: %w", err)
+	// }
 
 	// Register EventService
-	if err := pb.RegisterEventServiceHandlerFromEndpoint(ctx, gwmux, *grpcServerEndpoint, opts); err != nil {
-		return fmt.Errorf("failed to register EventService: %w", err)
-	}
+	// if err := pb.RegisterEventServiceHandlerFromEndpoint(ctx, gwmux, *grpcServerEndpoint, opts); err != nil {
+	//	return fmt.Errorf("failed to register EventService: %w", err)
+	// }
 
 	// Register CorrelationService
-	if err := pb.RegisterCorrelationServiceHandlerFromEndpoint(ctx, gwmux, *grpcServerEndpoint, opts); err != nil {
-		return fmt.Errorf("failed to register CorrelationService: %w", err)
-	}
+	// if err := pb.RegisterCorrelationServiceHandlerFromEndpoint(ctx, gwmux, *grpcServerEndpoint, opts); err != nil {
+	//	return fmt.Errorf("failed to register CorrelationService: %w", err)
+	// }
 
 	// Register ObservabilityService
-	if err := pb.RegisterObservabilityServiceHandlerFromEndpoint(ctx, gwmux, *grpcServerEndpoint, opts); err != nil {
-		return fmt.Errorf("failed to register ObservabilityService: %w", err)
-	}
+	// if err := pb.RegisterObservabilityServiceHandlerFromEndpoint(ctx, gwmux, *grpcServerEndpoint, opts); err != nil {
+	//	return fmt.Errorf("failed to register ObservabilityService: %w", err)
+	// }
 
 	// Create HTTP mux
 	mux := http.NewServeMux()
