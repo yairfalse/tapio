@@ -266,7 +266,7 @@ func (c *collector) processEvents() {
 
 			// Try to send event
 			select {
-			case c.eventChan <- event:
+			case c.eventChan <- *event:
 				// Event sent successfully
 			default:
 				// Buffer full, drop event
