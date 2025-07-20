@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/yairfalse/tapio/pkg/domain"
-	corrDomain "github.com/yairfalse/tapio/pkg/intelligence/correlation"
 	"go.uber.org/zap"
 )
 
