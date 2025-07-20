@@ -199,6 +199,14 @@ type KubernetesEventPayload struct {
 
 func (k KubernetesEventPayload) GetType() string { return "kubernetes" }
 
+// GenericEventPayload for general events with flexible data
+type GenericEventPayload struct {
+	Type string                 `json:"type"`
+	Data map[string]interface{} `json:"data"`
+}
+
+func (g GenericEventPayload) GetType() string { return g.Type }
+
 // ResourceInfo contains Kubernetes resource information
 type ResourceInfo struct {
 	Kind      string `json:"kind"`
@@ -490,12 +498,12 @@ type CorrelationMetadata struct {
 
 // Filter provides filtering criteria for event queries
 type Filter struct {
-	Since       time.Time `json:"since,omitempty"`
-	Until       time.Time `json:"until,omitempty"`
-	Type        string    `json:"type,omitempty"`
-	Severity    string    `json:"severity,omitempty"`
-	Namespace   string    `json:"namespace,omitempty"`
-	EntityName  string    `json:"entity_name,omitempty"`
-	EntityType  string    `json:"entity_type,omitempty"`
-	Limit       int       `json:"limit,omitempty"`
+	Since      time.Time `json:"since,omitempty"`
+	Until      time.Time `json:"until,omitempty"`
+	Type       string    `json:"type,omitempty"`
+	Severity   string    `json:"severity,omitempty"`
+	Namespace  string    `json:"namespace,omitempty"`
+	EntityName string    `json:"entity_name,omitempty"`
+	EntityType string    `json:"entity_type,omitempty"`
+	Limit      int       `json:"limit,omitempty"`
 }
