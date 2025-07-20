@@ -47,6 +47,7 @@ User Request → API Error → Database Timeout → Pod OOMKill → Memory Leak 
 🔄 **Cross-Layer Correlation** - Linking events from kernel to application  
 🔄 **Developer Experience** - Making it easy to run and test  
 
+<<<<<<< HEAD
 **What we haven't built yet:**
 
 ❌ Full production deployment  
@@ -55,6 +56,8 @@ User Request → API Error → Database Timeout → Pod OOMKill → Memory Leak 
 ❌ Automated remediation  
 ❌ UI/Dashboard  
 ❌ Distributed deployment
+=======
+>>>>>>> origin/main
 
 ## 🎯 Our Vision
 
@@ -219,8 +222,13 @@ correlation:
 *This is our goal for what end-to-end correlation might look like:*
 
 ```bash
+<<<<<<< HEAD
 # Future vision of tapio commands
 $ tapio correlate --trace-id abc123
+=======
+# Future vision of tapio-cli
+$ tapio-cli correlate --trace-id abc123
+>>>>>>> origin/main
 
 CORRELATION SUMMARY
 ═══════════════════
