@@ -12,7 +12,7 @@ Build enterprise-grade observability platform with modular architecture and sema
 Level 0: pkg/domain/          # Zero dependencies
 Level 1: pkg/collectors/      # Domain only
 Level 2: pkg/intelligence/    # Domain + L1
-Level 3: pkg/integrations/    # Domain + L1 + L2  
+Level 3: pkg/integrations/    # Domain + L1 + L2
 Level 4: pkg/interfaces/      # All above
 ```
 
@@ -20,7 +20,7 @@ Level 4: pkg/interfaces/      # All above
 
 ### Module Structure (MANDATORY)
 
-- Each major component has independent `go.mod`
+- We use one go.mod file.
 - Must build standalone: `cd pkg/X && go build ./...`
 - Must test standalone: `cd pkg/X && go test ./...`
 
@@ -30,7 +30,7 @@ Level 4: pkg/interfaces/      # All above
 
 1. **MUST FORMAT:** `make fmt` before any commit
 2. **MUST COMPILE:** `go build ./...` must pass
-3. **MUST TEST:** `go test ./...` must pass  
+3. **MUST TEST:** `go test ./...` must pass
 4. **NO STUBS:** No "TODO", "not implemented", empty functions
 5. **SHOW PROOF:** Paste build/test output or FAIL
 
@@ -58,7 +58,7 @@ go mod verify
 
 1. **CNI Plugin** - Network correlation
 2. **Database Collectors** - PostgreSQL, MySQL
-3. **DataDog Integration** - Enterprise revenue  
+3. **DataDog Integration** - Enterprise revenue
 4. **CDEvents Plugin** - CI/CD correlation
 5. **Parca Integration** - Continuous profiling
 
@@ -89,7 +89,7 @@ go mod verify
 
 - "Forgot to format" - Always run `make fmt`
 - "Complex existing code" - Use what exists
-- "Need to refactor first" - Follow requirements  
+- "Need to refactor first" - Follow requirements
 - "Just one small TODO" - Zero tolerance
 - "Can't find interfaces" - Ask for help
 
@@ -119,7 +119,7 @@ $ go build ./...
 
 ### Unit Tests
 
-```bash  
+```bash
 $ go test ./...
 [PASTE OUTPUT]
 ```
@@ -134,7 +134,7 @@ Total: Z lines
 
 ✅ Code properly formatted
 ✅ Follows 5-level hierarchy
-✅ Independent go.mod  
+✅ Independent go.mod
 ✅ No architectural violations
 ✅ Proper imports only
 

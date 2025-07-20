@@ -30,7 +30,6 @@ dev: fmt lint-fix test build ## Quick development cycle (format, lint, test, bui
 build: proto ## Build all binaries (includes proto generation)
 	@echo "$(BLUE)🔨 Building binaries...$(NC)"
 	@mkdir -p bin
-	@go build -ldflags "$(LDFLAGS)" -o bin/tapio-server ./cmd/tapio-server
 	@go build -ldflags "$(LDFLAGS)" -o bin/tapio-collector ./cmd/tapio-collector
 	@echo "$(GREEN)✅ Build complete: bin/$(NC)"
 	@ls -la bin/
