@@ -26,7 +26,7 @@ func main() {
 	config.RESTAddress = getEnv("TAPIO_REST_URL", "http://localhost:8081")
 	config.GRPCAddress = getEnv("TAPIO_GRPC_URL", "localhost:8080")
 	config.APIKey = os.Getenv("TAPIO_API_KEY")
-	
+
 	// Create client
 	tapioClient, err := client.NewClient(config)
 	if err != nil {
@@ -73,66 +73,66 @@ func main() {
 
 func checkSystemStatus(ctx context.Context, client *client.TapioClient) error {
 	log.Println("Checking system status...")
-	
+
 	status, err := client.GetStatus(ctx)
 	if err != nil {
 		return err
 	}
-	
+
 	log.Printf("System Status: %s", status.Status)
 	log.Printf("Version: %s", status.Version)
 	log.Printf("Uptime: %s", status.Uptime)
-	
+
 	// Get detailed system info
 	info, err := client.GetSystemInfo(ctx)
 	if err != nil {
 		return err
 	}
-	
+
 	log.Printf("Platform: %s", info.Platform)
 	log.Printf("Environment: %s", info.Environment)
 	log.Printf("Features enabled: %v", info.Features)
-	
+
 	// Check collectors
 	collectors, err := client.GetCollectorStatus(ctx)
 	if err != nil {
 		return err
 	}
-	
+
 	log.Printf("\nActive Collectors:")
 	for _, collector := range collectors.Collectors {
-		log.Printf("- %s: %s (%.2f events/sec)", 
-			collector.Name, 
-			collector.Status, 
+		log.Printf("- %s: %s (%.2f events/sec)",
+			collector.Name,
+			collector.Status,
 			collector.EventsPerSecond,
 		)
 	}
-	
+
 	return nil
 }
 
 func generateEvents(ctx context.Context, client *client.TapioClient) {
 	log.Println("Starting event generator...")
-	
+
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
-	
+
 	eventTypes := []string{"network", "kubernetes", "system", "application"}
 	severities := []string{"info", "warning", "error"}
 	services := []string{"api-gateway", "payment-service", "user-service", "notification-service"}
-	
+
 	eventCount := 0
-	
+
 	for {
 		select {
 		case <-ctx.Done():
 			log.Printf("Event generator stopped. Total events sent: %d", eventCount)
 			return
-			
+
 		case <-ticker.C:
 			// Generate batch of events
 			events := make([]*client.Event, 0, 5)
-			
+
 			for i := 0; i < 5; i++ {
 				event := &client.Event{
 					ID:        fmt.Sprintf("example_%d_%d", time.Now().Unix(), i),
@@ -148,17 +148,17 @@ func generateEvents(ctx context.Context, client *client.TapioClient) {
 				}
 				events = append(events, event)
 			}
-			
+
 			// Submit batch
 			resp, err := client.SubmitBulkEvents(ctx, events)
 			if err != nil {
 				log.Printf("Failed to submit events: %v", err)
 			} else {
-				log.Printf("Submitted %d events (success: %d, failed: %d)", 
+				log.Printf("Submitted %d events (success: %d, failed: %d)",
 					resp.Total, resp.Success, resp.Failed)
 				eventCount += resp.Success
 			}
-			
+
 			// Occasionally trigger correlation analysis
 			if eventCount > 0 && eventCount%20 == 0 {
 				go performCorrelationAnalysis(ctx, client, events)
@@ -169,32 +169,32 @@ func generateEvents(ctx context.Context, client *client.TapioClient) {
 
 func consumeEventStream(ctx context.Context, client *client.TapioClient) {
 	log.Println("Starting event stream consumer...")
-	
+
 	// Stream error events
 	eventStream, err := client.StreamEvents(ctx, "severity:error")
 	if err != nil {
 		log.Printf("Failed to start event stream: %v", err)
 		return
 	}
-	
+
 	errorCount := 0
-	
+
 	for {
 		select {
 		case <-ctx.Done():
 			log.Printf("Event stream consumer stopped. Total errors processed: %d", errorCount)
 			return
-			
+
 		case event, ok := <-eventStream:
 			if !ok {
 				log.Println("Event stream closed")
 				return
 			}
-			
+
 			errorCount++
-			log.Printf("ERROR EVENT: [%s] %s - %s (service: %s)", 
+			log.Printf("ERROR EVENT: [%s] %s - %s (service: %s)",
 				event.ID, event.Type, event.Message, event.Service)
-			
+
 			// Could trigger alerts, create tickets, etc.
 		}
 	}
@@ -202,49 +202,49 @@ func consumeEventStream(ctx context.Context, client *client.TapioClient) {
 
 func periodicAnalytics(ctx context.Context, client *client.TapioClient) {
 	log.Println("Starting periodic analytics...")
-	
+
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
 			log.Println("Periodic analytics stopped")
 			return
-			
+
 		case <-ticker.C:
 			// Get analytics for last 5 minutes
 			end := time.Now()
 			start := end.Add(-5 * time.Minute)
-			
+
 			summary, err := client.GetAnalyticsSummary(ctx, start, end)
 			if err != nil {
 				log.Printf("Failed to get analytics: %v", err)
 				continue
 			}
-			
+
 			log.Println("\n=== Analytics Summary ===")
 			log.Printf("Time range: %s to %s", start.Format(time.RFC3339), end.Format(time.RFC3339))
 			log.Printf("Total events: %d", summary.EventStatistics.Total)
-			
+
 			log.Println("\nEvents by type:")
 			for eventType, count := range summary.EventStatistics.ByType {
 				log.Printf("  %s: %d", eventType, count)
 			}
-			
+
 			log.Println("\nEvents by severity:")
 			for severity, count := range summary.EventStatistics.BySeverity {
 				log.Printf("  %s: %d", severity, count)
 			}
-			
+
 			if len(summary.TopIssues) > 0 {
 				log.Println("\nTop issues:")
 				for _, issue := range summary.TopIssues {
-					log.Printf("  - %s (%s): %d occurrences (%s)", 
+					log.Printf("  - %s (%s): %d occurrences (%s)",
 						issue.Description, issue.Severity, issue.Count, issue.Trend)
 				}
 			}
-			
+
 			log.Println("========================\n")
 		}
 	}
@@ -255,19 +255,19 @@ func performCorrelationAnalysis(ctx context.Context, client *client.TapioClient,
 	for i, event := range events {
 		eventIDs[i] = event.ID
 	}
-	
+
 	log.Printf("Performing correlation analysis on %d events...", len(eventIDs))
-	
+
 	analysis, err := client.AnalyzeCorrelations(ctx, eventIDs)
 	if err != nil {
 		log.Printf("Correlation analysis failed: %v", err)
 		return
 	}
-	
+
 	if len(analysis.Findings) > 0 {
 		log.Printf("Correlation analysis %s found %d patterns:", analysis.AnalysisID, len(analysis.Findings))
 		for _, finding := range analysis.Findings {
-			log.Printf("  - %s (confidence: %.2f): %s", 
+			log.Printf("  - %s (confidence: %.2f): %s",
 				finding.Pattern, finding.Confidence, finding.Description)
 		}
 	}
@@ -300,12 +300,12 @@ func generateMessage(eventType string) string {
 			"Background job completed",
 		},
 	}
-	
+
 	typeMessages, ok := messages[eventType]
 	if !ok {
 		return "Generic event occurred"
 	}
-	
+
 	return typeMessages[time.Now().Unix()%int64(len(typeMessages))]
 }
 

@@ -611,13 +611,13 @@ func (p *cniEventProcessor) extractTraceContext(raw core.CNIRawEvent) *domain.Tr
 func extractTraceID(annotations map[string]string) string {
 	traceKeys := []string{
 		"trace-id",
-		"traceId", 
+		"traceId",
 		"traceid",
 		"x-trace-id",
 		"opentelemetry.io/trace-id",
 		"jaeger.trace-id",
 	}
-	
+
 	for _, key := range traceKeys {
 		if value, ok := annotations[key]; ok && value != "" {
 			return value
@@ -626,17 +626,17 @@ func extractTraceID(annotations map[string]string) string {
 	return ""
 }
 
-// extractSpanID extracts span ID from various annotation keys  
+// extractSpanID extracts span ID from various annotation keys
 func extractSpanID(annotations map[string]string) string {
 	spanKeys := []string{
 		"span-id",
 		"spanId",
-		"spanid", 
+		"spanid",
 		"x-span-id",
 		"opentelemetry.io/span-id",
 		"jaeger.span-id",
 	}
-	
+
 	for _, key := range spanKeys {
 		if value, ok := annotations[key]; ok && value != "" {
 			return value

@@ -21,13 +21,13 @@ import (
 type ServerMiddleware struct {
 	logger *zap.Logger
 	tracer trace.Tracer
-	
+
 	// Metrics
-	mu                sync.RWMutex
-	requestCount      int64
-	errorCount        int64
-	totalLatency      time.Duration
-	requestHistogram  map[string]int64
+	mu               sync.RWMutex
+	requestCount     int64
+	errorCount       int64
+	totalLatency     time.Duration
+	requestHistogram map[string]int64
 }
 
 // NewServerMiddleware creates a new server middleware instance
@@ -43,7 +43,7 @@ func NewServerMiddleware(logger *zap.Logger, tracer trace.Tracer) *ServerMiddlew
 func (sm *ServerMiddleware) UnaryInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		start := time.Now()
-		
+
 		// Start tracing span
 		ctx, span := sm.tracer.Start(ctx, info.FullMethod,
 			trace.WithAttributes(
@@ -53,7 +53,7 @@ func (sm *ServerMiddleware) UnaryInterceptor() grpc.UnaryServerInterceptor {
 			),
 		)
 		defer span.End()
-		
+
 		// Add request metadata to span
 		if md, ok := metadata.FromIncomingContext(ctx); ok {
 			for key, values := range md {
@@ -62,27 +62,27 @@ func (sm *ServerMiddleware) UnaryInterceptor() grpc.UnaryServerInterceptor {
 				}
 			}
 		}
-		
+
 		// Log request start
 		sm.logger.Debug("gRPC request started",
 			zap.String("method", info.FullMethod),
 			zap.Time("start_time", start),
 		)
-		
+
 		// Call the handler
 		resp, err := handler(ctx, req)
-		
+
 		// Calculate latency
 		latency := time.Since(start)
-		
+
 		// Update metrics
 		sm.updateMetrics(info.FullMethod, latency, err)
-		
+
 		// Add latency to span
 		span.SetAttributes(
 			attribute.Int64("rpc.duration_ms", latency.Milliseconds()),
 		)
-		
+
 		// Handle errors
 		if err != nil {
 			span.RecordError(err)
@@ -91,7 +91,7 @@ func (sm *ServerMiddleware) UnaryInterceptor() grpc.UnaryServerInterceptor {
 				zap.Duration("latency", latency),
 				zap.Error(err),
 			)
-			
+
 			// Convert error to appropriate gRPC status
 			if grpcErr, ok := status.FromError(err); ok {
 				span.SetAttributes(attribute.String("grpc.status_code", grpcErr.Code().String()))
@@ -103,7 +103,7 @@ func (sm *ServerMiddleware) UnaryInterceptor() grpc.UnaryServerInterceptor {
 				zap.Duration("latency", latency),
 			)
 		}
-		
+
 		return resp, err
 	}
 }
@@ -112,7 +112,7 @@ func (sm *ServerMiddleware) UnaryInterceptor() grpc.UnaryServerInterceptor {
 func (sm *ServerMiddleware) StreamInterceptor() grpc.StreamServerInterceptor {
 	return func(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		start := time.Now()
-		
+
 		// Start tracing span
 		ctx, span := sm.tracer.Start(stream.Context(), info.FullMethod,
 			trace.WithAttributes(
@@ -123,32 +123,32 @@ func (sm *ServerMiddleware) StreamInterceptor() grpc.StreamServerInterceptor {
 			),
 		)
 		defer span.End()
-		
+
 		// Wrap stream with tracing context
 		wrappedStream := &tracedServerStream{
 			ServerStream: stream,
 			ctx:          ctx,
 		}
-		
+
 		sm.logger.Debug("gRPC stream started",
 			zap.String("method", info.FullMethod),
 			zap.Time("start_time", start),
 		)
-		
+
 		// Call the handler
 		err := handler(srv, wrappedStream)
-		
+
 		// Calculate latency
 		latency := time.Since(start)
-		
+
 		// Update metrics
 		sm.updateMetrics(info.FullMethod, latency, err)
-		
+
 		// Add latency to span
 		span.SetAttributes(
 			attribute.Int64("rpc.duration_ms", latency.Milliseconds()),
 		)
-		
+
 		if err != nil {
 			span.RecordError(err)
 			sm.logger.Error("gRPC stream failed",
@@ -162,7 +162,7 @@ func (sm *ServerMiddleware) StreamInterceptor() grpc.StreamServerInterceptor {
 				zap.Duration("latency", latency),
 			)
 		}
-		
+
 		return err
 	}
 }
@@ -181,11 +181,11 @@ func (s *tracedServerStream) Context() context.Context {
 func (sm *ServerMiddleware) updateMetrics(method string, latency time.Duration, err error) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
-	
+
 	sm.requestCount++
 	sm.totalLatency += latency
 	sm.requestHistogram[method]++
-	
+
 	if err != nil {
 		sm.errorCount++
 	}
@@ -195,41 +195,41 @@ func (sm *ServerMiddleware) updateMetrics(method string, latency time.Duration, 
 func (sm *ServerMiddleware) GetMetrics() map[string]interface{} {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
-	
+
 	avgLatency := float64(0)
 	if sm.requestCount > 0 {
 		avgLatency = float64(sm.totalLatency.Milliseconds()) / float64(sm.requestCount)
 	}
-	
+
 	errorRate := float64(0)
 	if sm.requestCount > 0 {
 		errorRate = float64(sm.errorCount) / float64(sm.requestCount)
 	}
-	
+
 	// Copy request histogram
 	histogram := make(map[string]int64)
 	for k, v := range sm.requestHistogram {
 		histogram[k] = v
 	}
-	
+
 	return map[string]interface{}{
-		"request_count":      sm.requestCount,
-		"error_count":        sm.errorCount,
-		"error_rate":         errorRate,
-		"avg_latency_ms":     avgLatency,
-		"request_histogram":  histogram,
+		"request_count":     sm.requestCount,
+		"error_count":       sm.errorCount,
+		"error_rate":        errorRate,
+		"avg_latency_ms":    avgLatency,
+		"request_histogram": histogram,
 	}
 }
 
 // RateLimitInterceptor provides rate limiting functionality
 func RateLimitInterceptor(requestsPerSecond int) grpc.UnaryServerInterceptor {
 	limiter := rate.NewLimiter(rate.Limit(requestsPerSecond), requestsPerSecond)
-	
+
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		if !limiter.Allow() {
 			return nil, status.Error(codes.ResourceExhausted, "rate limit exceeded")
 		}
-		
+
 		return handler(ctx, req)
 	}
 }
@@ -241,29 +241,29 @@ func AuthInterceptor() grpc.UnaryServerInterceptor {
 		if info.FullMethod == "/grpc.health.v1.Health/Check" {
 			return handler(ctx, req)
 		}
-		
+
 		// Get metadata
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {
 			return nil, status.Error(codes.Unauthenticated, "missing metadata")
 		}
-		
+
 		// Check for authorization token
 		authTokens := md.Get("authorization")
 		if len(authTokens) == 0 {
 			return nil, status.Error(codes.Unauthenticated, "missing authorization token")
 		}
-		
+
 		token := authTokens[0]
-		
+
 		// Validate token (simplified - would use real auth service)
 		if !isValidToken(token) {
 			return nil, status.Error(codes.Unauthenticated, "invalid authorization token")
 		}
-		
+
 		// Add user info to context (would extract from real token)
 		ctx = context.WithValue(ctx, "user_id", "authenticated_user")
-		
+
 		return handler(ctx, req)
 	}
 }
@@ -275,7 +275,7 @@ func ValidationInterceptor() grpc.UnaryServerInterceptor {
 		if err := validateRequest(info.FullMethod, req); err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "validation failed: %v", err)
 		}
-		
+
 		return handler(ctx, req)
 	}
 }
@@ -283,17 +283,17 @@ func ValidationInterceptor() grpc.UnaryServerInterceptor {
 // MetricsInterceptor provides detailed metrics collection
 func MetricsInterceptor() grpc.UnaryServerInterceptor {
 	metrics := &RequestMetrics{
-		methodCounts:   make(map[string]int64),
-		methodLatency:  make(map[string]time.Duration),
-		statusCounts:   make(map[string]int64),
+		methodCounts:  make(map[string]int64),
+		methodLatency: make(map[string]time.Duration),
+		statusCounts:  make(map[string]int64),
 	}
-	
+
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		start := time.Now()
-		
+
 		// Call handler
 		resp, err := handler(ctx, req)
-		
+
 		// Record metrics
 		latency := time.Since(start)
 		statusCode := codes.OK
@@ -302,12 +302,12 @@ func MetricsInterceptor() grpc.UnaryServerInterceptor {
 				statusCode = grpcErr.Code()
 			}
 		}
-		
+
 		metrics.recordRequest(info.FullMethod, latency, statusCode)
-		
+
 		// Add metrics to context for potential use by handlers
 		ctx = context.WithValue(ctx, "metrics", metrics)
-		
+
 		return resp, err
 	}
 }
@@ -323,7 +323,7 @@ type RequestMetrics struct {
 func (rm *RequestMetrics) recordRequest(method string, latency time.Duration, statusCode codes.Code) {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
-	
+
 	rm.methodCounts[method]++
 	rm.methodLatency[method] += latency
 	rm.statusCounts[statusCode.String()]++
@@ -332,29 +332,29 @@ func (rm *RequestMetrics) recordRequest(method string, latency time.Duration, st
 func (rm *RequestMetrics) GetMetrics() map[string]interface{} {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
-	
+
 	// Copy maps to avoid race conditions
 	methods := make(map[string]int64)
 	for k, v := range rm.methodCounts {
 		methods[k] = v
 	}
-	
+
 	latencies := make(map[string]float64)
 	for k, v := range rm.methodLatency {
 		if count, exists := rm.methodCounts[k]; exists && count > 0 {
 			latencies[k] = float64(v.Milliseconds()) / float64(count)
 		}
 	}
-	
+
 	statuses := make(map[string]int64)
 	for k, v := range rm.statusCounts {
 		statuses[k] = v
 	}
-	
+
 	return map[string]interface{}{
-		"method_counts":     methods,
-		"avg_latencies_ms":  latencies,
-		"status_counts":     statuses,
+		"method_counts":    methods,
+		"avg_latencies_ms": latencies,
+		"status_counts":    statuses,
 	}
 }
 
@@ -371,7 +371,7 @@ func validateRequest(method string, req interface{}) error {
 	if req == nil {
 		return fmt.Errorf("request cannot be nil")
 	}
-	
+
 	// Method-specific validation would go here
 	switch method {
 	case "/tapio.v1.EventService/SubmitEvent":
@@ -404,9 +404,9 @@ func HealthCheckInterceptor() grpc.UnaryServerInterceptor {
 		// Add health check metadata to context
 		start := time.Now()
 		ctx = context.WithValue(ctx, "health_check_start", start)
-		
+
 		resp, err := handler(ctx, req)
-		
+
 		// Log health check latency
 		latency := time.Since(start)
 		if latency > 100*time.Millisecond {
@@ -420,7 +420,7 @@ func HealthCheckInterceptor() grpc.UnaryServerInterceptor {
 				}
 			}
 		}
-		
+
 		return resp, err
 	}
 }
@@ -439,12 +439,12 @@ func RecoveryInterceptor() grpc.UnaryServerInterceptor {
 						)
 					}
 				}
-				
+
 				// Return internal error
 				err = status.Error(codes.Internal, "internal server error")
 			}
 		}()
-		
+
 		return handler(ctx, req)
 	}
 }

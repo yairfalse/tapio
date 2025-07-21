@@ -20,14 +20,14 @@ import (
 // TapioServer implements the main Tapio service
 type TapioServer struct {
 	pb.UnimplementedTapioServiceServer
-	
+
 	logger *zap.Logger
 	tracer trace.Tracer
-	
+
 	// L3 Integration layer dependencies
 	collectorMgr *manager.CollectorManager
 	dataFlow     *dataflow.TapioDataFlow
-	
+
 	// Statistics
 	stats struct {
 		mu           sync.RWMutex
@@ -60,12 +60,12 @@ func (s *TapioServer) SetDependencies(collectorMgr *manager.CollectorManager, da
 // GetStatus returns the overall system status
 func (s *TapioServer) GetStatus(ctx context.Context, req *pb.GetStatusRequest) (*pb.GetStatusResponse, error) {
 	s.incrementRequestCount()
-	
+
 	ctx, span := s.tracer.Start(ctx, "tapio.get_status")
 	defer span.End()
-	
+
 	s.logger.Debug("Getting Tapio system status")
-	
+
 	// Get collector manager statistics
 	var collectorStats *pb.CollectorManagerStatus
 	if s.collectorMgr != nil {
@@ -75,7 +75,7 @@ func (s *TapioServer) GetStatus(ctx context.Context, req *pb.GetStatusRequest) (
 			TotalEvents:      stats.TotalEvents,
 		}
 	}
-	
+
 	// Get dataflow metrics
 	var dataflowMetrics map[string]float64
 	if s.dataFlow != nil {
@@ -87,12 +87,12 @@ func (s *TapioServer) GetStatus(ctx context.Context, req *pb.GetStatusRequest) (
 			}
 		}
 	}
-	
+
 	s.stats.mu.RLock()
 	uptime := time.Since(s.stats.startTime)
 	requestCount := s.stats.requestCount
 	s.stats.mu.RUnlock()
-	
+
 	return &pb.GetStatusResponse{
 		Status:    pb.SystemStatus_SYSTEM_STATUS_HEALTHY,
 		Timestamp: timestamppb.Now(),
@@ -112,23 +112,23 @@ func (s *TapioServer) GetStatus(ctx context.Context, req *pb.GetStatusRequest) (
 // GetConfiguration returns the current system configuration
 func (s *TapioServer) GetConfiguration(ctx context.Context, req *pb.GetConfigurationRequest) (*pb.GetConfigurationResponse, error) {
 	s.incrementRequestCount()
-	
+
 	ctx, span := s.tracer.Start(ctx, "tapio.get_configuration")
 	defer span.End()
-	
+
 	s.logger.Debug("Getting Tapio system configuration")
-	
+
 	// Return basic configuration - this would be expanded based on actual config system
 	return &pb.GetConfigurationResponse{
 		Environment: "production",
 		Features: map[string]bool{
 			"semantic_correlation": true,
-			"distributed_tracing": true,
-			"real_time_streaming": true,
+			"distributed_tracing":  true,
+			"real_time_streaming":  true,
 		},
 		Settings: map[string]string{
 			"correlation_engine": "enabled",
-			"buffer_size":       "10000",
+			"buffer_size":        "10000",
 		},
 	}, nil
 }
@@ -137,7 +137,7 @@ func (s *TapioServer) GetConfiguration(ctx context.Context, req *pb.GetConfigura
 func (s *TapioServer) GetServiceStats() map[string]interface{} {
 	s.stats.mu.RLock()
 	defer s.stats.mu.RUnlock()
-	
+
 	return map[string]interface{}{
 		"start_time":     s.stats.startTime,
 		"uptime_seconds": time.Since(s.stats.startTime).Seconds(),
@@ -152,11 +152,11 @@ func (s *TapioServer) HealthCheck() error {
 	if s.collectorMgr == nil {
 		return fmt.Errorf("collector manager not initialized")
 	}
-	
+
 	if s.dataFlow == nil {
 		return fmt.Errorf("dataflow engine not initialized")
 	}
-	
+
 	return nil
 }
 
@@ -169,13 +169,13 @@ func (s *TapioServer) incrementRequestCount() {
 // CollectorServer implements the collector management service
 type CollectorServer struct {
 	pb.UnimplementedCollectorServiceServer
-	
+
 	logger *zap.Logger
 	tracer trace.Tracer
-	
+
 	// L3 Integration layer dependencies
 	collectorMgr *manager.CollectorManager
-	
+
 	// Statistics
 	stats struct {
 		mu           sync.RWMutex
@@ -207,58 +207,58 @@ func (s *CollectorServer) SetCollectorManager(collectorMgr *manager.CollectorMan
 // ListCollectors returns information about all active collectors
 func (s *CollectorServer) ListCollectors(ctx context.Context, req *pb.ListCollectorsRequest) (*pb.ListCollectorsResponse, error) {
 	s.incrementRequestCount()
-	
+
 	ctx, span := s.tracer.Start(ctx, "collector.list_collectors")
 	defer span.End()
-	
+
 	s.logger.Debug("Listing active collectors")
-	
+
 	if s.collectorMgr == nil {
 		return nil, status.Error(codes.Internal, "collector manager not initialized")
 	}
-	
+
 	// Get statistics from collector manager
 	stats := s.collectorMgr.Statistics()
-	
+
 	// Create response with collector information
 	// Note: This would need to be expanded to get actual collector details
 	collectors := []*pb.CollectorInfo{
 		{
-			Name:     "systemd",
-			Type:     pb.CollectorType_COLLECTOR_TYPE_SYSTEMD,
-			Status:   pb.CollectorStatus_COLLECTOR_STATUS_RUNNING,
-			LastSeen: timestamppb.Now(),
+			Name:            "systemd",
+			Type:            pb.CollectorType_COLLECTOR_TYPE_SYSTEMD,
+			Status:          pb.CollectorStatus_COLLECTOR_STATUS_RUNNING,
+			LastSeen:        timestamppb.Now(),
 			EventsProcessed: 1000,
 		},
 		{
-			Name:     "kubernetes",
-			Type:     pb.CollectorType_COLLECTOR_TYPE_KUBERNETES,
-			Status:   pb.CollectorStatus_COLLECTOR_STATUS_RUNNING,
-			LastSeen: timestamppb.Now(),
+			Name:            "kubernetes",
+			Type:            pb.CollectorType_COLLECTOR_TYPE_KUBERNETES,
+			Status:          pb.CollectorStatus_COLLECTOR_STATUS_RUNNING,
+			LastSeen:        timestamppb.Now(),
 			EventsProcessed: 500,
 		},
 	}
-	
+
 	return &pb.ListCollectorsResponse{
-		Collectors:    collectors,
-		TotalCount:    int32(stats.ActiveCollectors),
-		ResponseTime:  timestamppb.Now(),
+		Collectors:   collectors,
+		TotalCount:   int32(stats.ActiveCollectors),
+		ResponseTime: timestamppb.Now(),
 	}, nil
 }
 
 // GetCollectorHealth returns health information for a specific collector
 func (s *CollectorServer) GetCollectorHealth(ctx context.Context, req *pb.GetCollectorHealthRequest) (*pb.GetCollectorHealthResponse, error) {
 	s.incrementRequestCount()
-	
+
 	ctx, span := s.tracer.Start(ctx, "collector.get_health")
 	defer span.End()
-	
+
 	s.logger.Debug("Getting collector health", zap.String("collector", req.CollectorName))
-	
+
 	if s.collectorMgr == nil {
 		return nil, status.Error(codes.Internal, "collector manager not initialized")
 	}
-	
+
 	// This would need to be implemented to get actual health from specific collector
 	return &pb.GetCollectorHealthResponse{
 		CollectorName: req.CollectorName,
@@ -268,8 +268,8 @@ func (s *CollectorServer) GetCollectorHealth(ctx context.Context, req *pb.GetCol
 		Uptime:        3600, // 1 hour
 		Metrics: map[string]float64{
 			"events_per_second": 10.5,
-			"cpu_usage":        25.0,
-			"memory_usage":     128.0,
+			"cpu_usage":         25.0,
+			"memory_usage":      128.0,
 		},
 	}, nil
 }
@@ -278,7 +278,7 @@ func (s *CollectorServer) GetCollectorHealth(ctx context.Context, req *pb.GetCol
 func (s *CollectorServer) GetServiceStats() map[string]interface{} {
 	s.stats.mu.RLock()
 	defer s.stats.mu.RUnlock()
-	
+
 	return map[string]interface{}{
 		"start_time":     s.stats.startTime,
 		"uptime_seconds": time.Since(s.stats.startTime).Seconds(),
@@ -304,10 +304,10 @@ func (s *CollectorServer) incrementRequestCount() {
 // ObservabilityServer implements observability and monitoring services
 type ObservabilityServer struct {
 	pb.UnimplementedObservabilityServiceServer
-	
+
 	logger *zap.Logger
 	tracer trace.Tracer
-	
+
 	// Statistics
 	stats struct {
 		mu           sync.RWMutex
@@ -336,12 +336,12 @@ func NewObservabilityServer(logger *zap.Logger, tracer trace.Tracer) *Observabil
 // GetMetrics returns system metrics
 func (s *ObservabilityServer) GetMetrics(ctx context.Context, req *pb.GetMetricsRequest) (*pb.GetMetricsResponse, error) {
 	s.incrementRequestCount()
-	
+
 	ctx, span := s.tracer.Start(ctx, "observability.get_metrics")
 	defer span.End()
-	
+
 	s.logger.Debug("Getting system metrics")
-	
+
 	// Create sample metrics - this would integrate with actual metrics collection
 	metrics := []*pb.Metric{
 		{
@@ -362,15 +362,15 @@ func (s *ObservabilityServer) GetMetrics(ctx context.Context, req *pb.GetMetrics
 			},
 		},
 	}
-	
+
 	s.stats.mu.Lock()
 	s.stats.metricsCount += uint64(len(metrics))
 	s.stats.mu.Unlock()
-	
+
 	return &pb.GetMetricsResponse{
-		Metrics:     metrics,
-		TotalCount:  int32(len(metrics)),
-		Timestamp:   timestamppb.Now(),
+		Metrics:    metrics,
+		TotalCount: int32(len(metrics)),
+		Timestamp:  timestamppb.Now(),
 	}, nil
 }
 
@@ -378,7 +378,7 @@ func (s *ObservabilityServer) GetMetrics(ctx context.Context, req *pb.GetMetrics
 func (s *ObservabilityServer) GetServiceStats() map[string]interface{} {
 	s.stats.mu.RLock()
 	defer s.stats.mu.RUnlock()
-	
+
 	return map[string]interface{}{
 		"start_time":     s.stats.startTime,
 		"uptime_seconds": time.Since(s.stats.startTime).Seconds(),

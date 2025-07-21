@@ -81,14 +81,14 @@ func testGRPCEndpoints(t *testing.T, grpcAddr string) {
 
 	t.Run("TapioService", func(t *testing.T) {
 		client := pb.NewTapioServiceClient(conn)
-		
+
 		// Test GetStatus
 		resp, err := client.GetStatus(context.Background(), &pb.GetStatusRequest{})
 		require.NoError(t, err)
 		assert.Equal(t, pb.SystemStatus_SYSTEM_STATUS_HEALTHY, resp.Status)
 		assert.NotEmpty(t, resp.Version)
 		assert.Greater(t, resp.Uptime, int64(0))
-		
+
 		// Test GetConfiguration
 		configResp, err := client.GetConfiguration(context.Background(), &pb.GetConfigurationRequest{})
 		require.NoError(t, err)
@@ -98,7 +98,7 @@ func testGRPCEndpoints(t *testing.T, grpcAddr string) {
 
 	t.Run("EventService", func(t *testing.T) {
 		client := pb.NewEventServiceClient(conn)
-		
+
 		// Test SubmitEvent
 		event := &pb.Event{
 			Id:        "test_event_001",
@@ -107,14 +107,14 @@ func testGRPCEndpoints(t *testing.T, grpcAddr string) {
 			Timestamp: timestamppb(),
 			Message:   "Test event from integration test",
 		}
-		
+
 		submitResp, err := client.SubmitEvent(context.Background(), &pb.SubmitEventRequest{
 			Event: event,
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "test_event_001", submitResp.EventId)
 		assert.Equal(t, "accepted", submitResp.Status)
-		
+
 		// Test QueryEvents
 		queryResp, err := client.QueryEvents(context.Background(), &pb.QueryEventsRequest{
 			Filter: &pb.Filter{
@@ -127,12 +127,12 @@ func testGRPCEndpoints(t *testing.T, grpcAddr string) {
 
 	t.Run("CollectorService", func(t *testing.T) {
 		client := pb.NewCollectorServiceClient(conn)
-		
+
 		// Test ListCollectors
 		resp, err := client.ListCollectors(context.Background(), &pb.ListCollectorsRequest{})
 		require.NoError(t, err)
 		assert.NotNil(t, resp.Collectors)
-		
+
 		// Test GetCollectorHealth
 		healthResp, err := client.GetCollectorHealth(context.Background(), &pb.GetCollectorHealthRequest{
 			CollectorName: "systemd",
@@ -144,7 +144,7 @@ func testGRPCEndpoints(t *testing.T, grpcAddr string) {
 
 	t.Run("CorrelationService", func(t *testing.T) {
 		client := pb.NewCorrelationServiceClient(conn)
-		
+
 		// Test AnalyzeEvents
 		events := []*pb.Event{
 			{
@@ -160,7 +160,7 @@ func testGRPCEndpoints(t *testing.T, grpcAddr string) {
 				Message:   "Kubernetes event for correlation",
 			},
 		}
-		
+
 		analyzeResp, err := client.AnalyzeEvents(context.Background(), &pb.AnalyzeEventsRequest{
 			Events:       events,
 			AnalysisType: pb.AnalysisType_ANALYSIS_TYPE_SEMANTIC,
@@ -168,7 +168,7 @@ func testGRPCEndpoints(t *testing.T, grpcAddr string) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, analyzeResp.AnalysisId)
 		assert.Equal(t, pb.AnalysisStatus_ANALYSIS_STATUS_COMPLETED, analyzeResp.Status)
-		
+
 		// Test GetCorrelations
 		corrResp, err := client.GetCorrelations(context.Background(), &pb.GetCorrelationsRequest{
 			Limit: 10,
@@ -179,7 +179,7 @@ func testGRPCEndpoints(t *testing.T, grpcAddr string) {
 
 	t.Run("ObservabilityService", func(t *testing.T) {
 		client := pb.NewObservabilityServiceClient(conn)
-		
+
 		// Test GetMetrics
 		resp, err := client.GetMetrics(context.Background(), &pb.GetMetricsRequest{})
 		require.NoError(t, err)
@@ -204,14 +204,14 @@ func testRESTEndpoints(t *testing.T, httpAddr string) {
 				"test": true,
 			},
 		}
-		
+
 		body, _ := json.Marshal(event)
 		resp, err := http.Post(baseURL+"/events", "application/json", bytes.NewReader(body))
 		require.NoError(t, err)
 		defer resp.Body.Close()
-		
+
 		assert.Equal(t, http.StatusAccepted, resp.StatusCode)
-		
+
 		var result EventIngestResponse
 		err = json.NewDecoder(resp.Body).Decode(&result)
 		require.NoError(t, err)
@@ -237,14 +237,14 @@ func testRESTEndpoints(t *testing.T, httpAddr string) {
 				Message:   "Bulk event 2",
 			},
 		}
-		
+
 		body, _ := json.Marshal(events)
 		resp, err := http.Post(baseURL+"/events/bulk", "application/json", bytes.NewReader(body))
 		require.NoError(t, err)
 		defer resp.Body.Close()
-		
+
 		assert.Equal(t, http.StatusAccepted, resp.StatusCode)
-		
+
 		var result BulkIngestResponse
 		err = json.NewDecoder(resp.Body).Decode(&result)
 		require.NoError(t, err)
@@ -263,14 +263,14 @@ func testRESTEndpoints(t *testing.T, httpAddr string) {
 			},
 			Limit: 10,
 		}
-		
+
 		body, _ := json.Marshal(searchReq)
 		resp, err := http.Post(baseURL+"/events/search", "application/json", bytes.NewReader(body))
 		require.NoError(t, err)
 		defer resp.Body.Close()
-		
+
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		
+
 		var result EventSearchResponse
 		err = json.NewDecoder(resp.Body).Decode(&result)
 		require.NoError(t, err)
@@ -283,9 +283,9 @@ func testRESTEndpoints(t *testing.T, httpAddr string) {
 		resp, err := http.Get(baseURL + "/collectors/status")
 		require.NoError(t, err)
 		defer resp.Body.Close()
-		
+
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		
+
 		var result CollectorStatusResponse
 		err = json.NewDecoder(resp.Body).Decode(&result)
 		require.NoError(t, err)
@@ -297,9 +297,9 @@ func testRESTEndpoints(t *testing.T, httpAddr string) {
 		resp, err := http.Get(baseURL + "/analytics/summary")
 		require.NoError(t, err)
 		defer resp.Body.Close()
-		
+
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		
+
 		var result AnalyticsSummaryResponse
 		err = json.NewDecoder(resp.Body).Decode(&result)
 		require.NoError(t, err)
@@ -311,9 +311,9 @@ func testRESTEndpoints(t *testing.T, httpAddr string) {
 		resp, err := http.Get(baseURL + "/system/info")
 		require.NoError(t, err)
 		defer resp.Body.Close()
-		
+
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		
+
 		var result SystemInfoResponse
 		err = json.NewDecoder(resp.Body).Decode(&result)
 		require.NoError(t, err)
@@ -329,7 +329,7 @@ func testHealthChecks(t *testing.T, grpcAddr, httpAddr string) {
 		conn, err := grpc.Dial(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		require.NoError(t, err)
 		defer conn.Close()
-		
+
 		client := grpc_health_v1.NewHealthClient(conn)
 		resp, err := client.Check(context.Background(), &grpc_health_v1.HealthCheckRequest{})
 		require.NoError(t, err)
@@ -342,30 +342,30 @@ func testHealthChecks(t *testing.T, grpcAddr, httpAddr string) {
 		require.NoError(t, err)
 		defer resp.Body.Close()
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		
+
 		var health map[string]interface{}
 		err = json.NewDecoder(resp.Body).Decode(&health)
 		require.NoError(t, err)
 		assert.Equal(t, "healthy", health["status"])
-		
+
 		// Readiness check
 		resp, err = http.Get(fmt.Sprintf("http://%s/health/ready", httpAddr))
 		require.NoError(t, err)
 		defer resp.Body.Close()
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		
+
 		// Liveness check
 		resp, err = http.Get(fmt.Sprintf("http://%s/health/live", httpAddr))
 		require.NoError(t, err)
 		defer resp.Body.Close()
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		
+
 		// Detailed health
 		resp, err = http.Get(fmt.Sprintf("http://%s/api/v1/system/health/detailed", httpAddr))
 		require.NoError(t, err)
 		defer resp.Body.Close()
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		
+
 		var detailed DetailedHealthResponse
 		err = json.NewDecoder(resp.Body).Decode(&detailed)
 		require.NoError(t, err)
@@ -382,34 +382,34 @@ func TestEventStreaming(t *testing.T) {
 	config := DefaultUnifiedServerConfig()
 	config.GRPCAddress = ":0"
 	config.HTTPAddress = ":0"
-	
+
 	server, err := NewUnifiedServer(config, logger)
 	require.NoError(t, err)
-	
+
 	err = server.Start(context.Background())
 	require.NoError(t, err)
 	defer server.Stop(context.Background())
-	
+
 	httpAddr := server.httpListener.Addr().String()
-	
+
 	t.Run("SSE Streaming", func(t *testing.T) {
 		// Create SSE request
 		req, err := http.NewRequest("GET", fmt.Sprintf("http://%s/api/v1/events/stream", httpAddr), nil)
 		require.NoError(t, err)
 		req.Header.Set("Accept", "text/event-stream")
-		
+
 		// Create client with timeout
 		client := &http.Client{
 			Timeout: 5 * time.Second,
 		}
-		
+
 		resp, err := client.Do(req)
 		require.NoError(t, err)
 		defer resp.Body.Close()
-		
+
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		assert.Equal(t, "text/event-stream", resp.Header.Get("Content-Type"))
-		
+
 		// Read first event (should be connected event)
 		buf := make([]byte, 1024)
 		n, err := resp.Body.Read(buf)
@@ -425,32 +425,32 @@ func TestConcurrentRequests(t *testing.T) {
 	config.GRPCAddress = ":0"
 	config.HTTPAddress = ":0"
 	config.MaxRequestsPerSec = 1000
-	
+
 	server, err := NewUnifiedServer(config, logger)
 	require.NoError(t, err)
-	
+
 	err = server.Start(context.Background())
 	require.NoError(t, err)
 	defer server.Stop(context.Background())
-	
+
 	httpAddr := server.httpListener.Addr().String()
 	baseURL := fmt.Sprintf("http://%s/api/v1", httpAddr)
-	
+
 	// Run concurrent requests
 	concurrency := 10
 	requestsPerWorker := 100
-	
+
 	type result struct {
 		success int
 		failed  int
 	}
-	
+
 	results := make(chan result, concurrency)
-	
+
 	for i := 0; i < concurrency; i++ {
 		go func(workerID int) {
 			r := result{}
-			
+
 			for j := 0; j < requestsPerWorker; j++ {
 				event := EventIngestRequest{
 					ID:        fmt.Sprintf("concurrent_%d_%d", workerID, j),
@@ -459,10 +459,10 @@ func TestConcurrentRequests(t *testing.T) {
 					Timestamp: time.Now(),
 					Message:   fmt.Sprintf("Concurrent test event from worker %d", workerID),
 				}
-				
+
 				body, _ := json.Marshal(event)
 				resp, err := http.Post(baseURL+"/events", "application/json", bytes.NewReader(body))
-				
+
 				if err == nil && resp.StatusCode == http.StatusAccepted {
 					r.success++
 					resp.Body.Close()
@@ -473,21 +473,21 @@ func TestConcurrentRequests(t *testing.T) {
 					}
 				}
 			}
-			
+
 			results <- r
 		}(i)
 	}
-	
+
 	// Collect results
 	totalSuccess := 0
 	totalFailed := 0
-	
+
 	for i := 0; i < concurrency; i++ {
 		r := <-results
 		totalSuccess += r.success
 		totalFailed += r.failed
 	}
-	
+
 	// Verify results
 	t.Logf("Concurrent test results: %d successful, %d failed", totalSuccess, totalFailed)
 	assert.Greater(t, totalSuccess, 0)
@@ -500,44 +500,44 @@ func TestErrorHandling(t *testing.T) {
 	config := DefaultUnifiedServerConfig()
 	config.GRPCAddress = ":0"
 	config.HTTPAddress = ":0"
-	
+
 	server, err := NewUnifiedServer(config, logger)
 	require.NoError(t, err)
-	
+
 	err = server.Start(context.Background())
 	require.NoError(t, err)
 	defer server.Stop(context.Background())
-	
+
 	httpAddr := server.httpListener.Addr().String()
 	baseURL := fmt.Sprintf("http://%s/api/v1", httpAddr)
-	
+
 	t.Run("Invalid JSON", func(t *testing.T) {
 		resp, err := http.Post(baseURL+"/events", "application/json", bytes.NewReader([]byte("invalid json")))
 		require.NoError(t, err)
 		defer resp.Body.Close()
-		
+
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-		
+
 		var errResp ErrorResponse
 		err = json.NewDecoder(resp.Body).Decode(&errResp)
 		require.NoError(t, err)
 		assert.Equal(t, "Bad Request", errResp.Error)
 		assert.Contains(t, errResp.Message, "Invalid JSON")
 	})
-	
+
 	t.Run("Method Not Allowed", func(t *testing.T) {
 		resp, err := http.Get(baseURL + "/events/search") // Should be POST
 		require.NoError(t, err)
 		defer resp.Body.Close()
-		
+
 		assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
 	})
-	
+
 	t.Run("Not Found", func(t *testing.T) {
 		resp, err := http.Get(baseURL + "/nonexistent")
 		require.NoError(t, err)
 		defer resp.Body.Close()
-		
+
 		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
 }

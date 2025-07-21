@@ -3,12 +3,15 @@ package internal
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/yairfalse/tapio/pkg/collectors/systemd/core"
 	"github.com/yairfalse/tapio/pkg/domain"
+	"github.com/yairfalse/tapio/pkg/integrations/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // collector implements the core.Collector interface
@@ -47,6 +50,9 @@ type collector struct {
 
 	// Platform-specific implementation
 	impl platformImpl
+
+	// OpenTelemetry instrumentation
+	otelInstrumentation *otel.CollectorInstrumentation
 }
 
 // platformImpl is the platform-specific interface

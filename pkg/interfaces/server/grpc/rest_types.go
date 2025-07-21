@@ -34,32 +34,32 @@ type BulkIngestResponse struct {
 }
 
 type EventSearchRequest struct {
-	Query      string                 `json:"query" example:"type:network AND severity:error"`
-	TimeRange  TimeRange              `json:"time_range"`
-	Filters    map[string][]string    `json:"filters,omitempty"`
-	Limit      int                    `json:"limit,omitempty" example:"100"`
-	Offset     int                    `json:"offset,omitempty" example:"0"`
-	SortBy     string                 `json:"sort_by,omitempty" example:"timestamp"`
-	SortOrder  string                 `json:"sort_order,omitempty" example:"desc"`
+	Query     string              `json:"query" example:"type:network AND severity:error"`
+	TimeRange TimeRange           `json:"time_range"`
+	Filters   map[string][]string `json:"filters,omitempty"`
+	Limit     int                 `json:"limit,omitempty" example:"100"`
+	Offset    int                 `json:"offset,omitempty" example:"0"`
+	SortBy    string              `json:"sort_by,omitempty" example:"timestamp"`
+	SortOrder string              `json:"sort_order,omitempty" example:"desc"`
 }
 
 type EventSearchResponse struct {
-	Query        string                    `json:"query"`
-	TotalHits    int64                     `json:"total_hits" example:"1523"`
-	ReturnedHits int                       `json:"returned_hits" example:"100"`
-	Events       []EventSearchResult       `json:"events"`
-	Facets       map[string][]FacetValue   `json:"facets"`
-	Timestamp    time.Time                 `json:"timestamp"`
+	Query        string                  `json:"query"`
+	TotalHits    int64                   `json:"total_hits" example:"1523"`
+	ReturnedHits int                     `json:"returned_hits" example:"100"`
+	Events       []EventSearchResult     `json:"events"`
+	Facets       map[string][]FacetValue `json:"facets"`
+	Timestamp    time.Time               `json:"timestamp"`
 }
 
 type EventSearchResult struct {
-	ID        string                 `json:"id"`
-	Type      string                 `json:"type"`
-	Severity  string                 `json:"severity"`
-	Timestamp time.Time              `json:"timestamp"`
-	Message   string                 `json:"message"`
-	Score     float64                `json:"score"`
-	Highlight map[string][]string    `json:"highlight,omitempty"`
+	ID        string              `json:"id"`
+	Type      string              `json:"type"`
+	Severity  string              `json:"severity"`
+	Timestamp time.Time           `json:"timestamp"`
+	Message   string              `json:"message"`
+	Score     float64             `json:"score"`
+	Highlight map[string][]string `json:"highlight,omitempty"`
 }
 
 type FacetValue struct {
@@ -79,10 +79,10 @@ type CorrelationUpdate struct {
 }
 
 type PatternDiscoveryRequest struct {
-	TimeRange      TimeRange `json:"time_range"`
-	MinConfidence  float64   `json:"min_confidence,omitempty" example:"0.7"`
-	PatternTypes   []string  `json:"pattern_types,omitempty"`
-	MaxPatterns    int       `json:"max_patterns,omitempty" example:"10"`
+	TimeRange     TimeRange `json:"time_range"`
+	MinConfidence float64   `json:"min_confidence,omitempty" example:"0.7"`
+	PatternTypes  []string  `json:"pattern_types,omitempty"`
+	MaxPatterns   int       `json:"max_patterns,omitempty" example:"10"`
 }
 
 type PatternDiscoveryResponse struct {
@@ -101,20 +101,20 @@ type DiscoveredPattern struct {
 }
 
 type ImpactAnalysisRequest struct {
-	EventID         string   `json:"event_id" example:"evt_001"`
-	IncludeServices bool     `json:"include_services,omitempty"`
-	IncludeMetrics  bool     `json:"include_metrics,omitempty"`
-	TimeHorizon     string   `json:"time_horizon,omitempty" example:"2h"`
+	EventID         string `json:"event_id" example:"evt_001"`
+	IncludeServices bool   `json:"include_services,omitempty"`
+	IncludeMetrics  bool   `json:"include_metrics,omitempty"`
+	TimeHorizon     string `json:"time_horizon,omitempty" example:"2h"`
 }
 
 type ImpactAnalysisResponse struct {
-	EventID           string          `json:"event_id"`
-	Impact            ImpactDetails   `json:"impact"`
-	AffectedServices  []string        `json:"affected_services"`
-	AffectedCustomers int             `json:"affected_customers" example:"1250"`
-	EstimatedDuration string          `json:"estimated_duration" example:"2h30m"`
-	Recommendations   []string        `json:"recommendations"`
-	Timestamp         time.Time       `json:"timestamp"`
+	EventID           string        `json:"event_id"`
+	Impact            ImpactDetails `json:"impact"`
+	AffectedServices  []string      `json:"affected_services"`
+	AffectedCustomers int           `json:"affected_customers" example:"1250"`
+	EstimatedDuration string        `json:"estimated_duration" example:"2h30m"`
+	Recommendations   []string      `json:"recommendations"`
+	Timestamp         time.Time     `json:"timestamp"`
 }
 
 type ImpactDetails struct {
@@ -158,18 +158,18 @@ type CollectorConfigResponse struct {
 // Analytics Types
 
 type AnalyticsSummaryResponse struct {
-	TimeRange             TimeRange         `json:"time_range"`
-	EventStatistics       EventStats        `json:"event_statistics"`
-	CorrelationStatistics CorrelationStats  `json:"correlation_statistics"`
-	TopIssues             []TopIssue        `json:"top_issues"`
-	Timestamp             time.Time         `json:"timestamp"`
+	TimeRange             TimeRange        `json:"time_range"`
+	EventStatistics       EventStats       `json:"event_statistics"`
+	CorrelationStatistics CorrelationStats `json:"correlation_statistics"`
+	TopIssues             []TopIssue       `json:"top_issues"`
+	Timestamp             time.Time        `json:"timestamp"`
 }
 
 type EventStats struct {
-	Total         int64              `json:"total" example:"145892"`
-	ByType        map[string]int64   `json:"by_type"`
-	BySeverity    map[string]int64   `json:"by_severity"`
-	EventsPerHour []int64            `json:"events_per_hour"`
+	Total         int64            `json:"total" example:"145892"`
+	ByType        map[string]int64 `json:"by_type"`
+	BySeverity    map[string]int64 `json:"by_severity"`
+	EventsPerHour []int64          `json:"events_per_hour"`
 }
 
 type CorrelationStats struct {
@@ -186,12 +186,12 @@ type TopIssue struct {
 }
 
 type TrendAnalysisResponse struct {
-	Metric     string           `json:"metric" example:"events"`
-	Period     string           `json:"period" example:"1h"`
-	Trends     []TrendData      `json:"trends"`
-	Prediction PredictionData   `json:"prediction"`
-	Anomalies  []AnomalyData    `json:"anomalies"`
-	Timestamp  time.Time        `json:"timestamp"`
+	Metric     string         `json:"metric" example:"events"`
+	Period     string         `json:"period" example:"1h"`
+	Trends     []TrendData    `json:"trends"`
+	Prediction PredictionData `json:"prediction"`
+	Anomalies  []AnomalyData  `json:"anomalies"`
+	Timestamp  time.Time      `json:"timestamp"`
 }
 
 type TrendData struct {
@@ -216,17 +216,17 @@ type AnomalyData struct {
 // System Types
 
 type SystemInfoResponse struct {
-	Version     string         `json:"version" example:"1.0.0"`
-	BuildTime   string         `json:"build_time" example:"2024-01-01T00:00:00Z"`
-	GitCommit   string         `json:"git_commit" example:"abc123def"`
-	GoVersion   string         `json:"go_version" example:"1.21"`
-	Platform    string         `json:"platform" example:"linux/amd64"`
-	StartTime   time.Time      `json:"start_time"`
-	Uptime      int64          `json:"uptime_seconds" example:"3600"`
-	Environment string         `json:"environment" example:"production"`
+	Version     string          `json:"version" example:"1.0.0"`
+	BuildTime   string          `json:"build_time" example:"2024-01-01T00:00:00Z"`
+	GitCommit   string          `json:"git_commit" example:"abc123def"`
+	GoVersion   string          `json:"go_version" example:"1.21"`
+	Platform    string          `json:"platform" example:"linux/amd64"`
+	StartTime   time.Time       `json:"start_time"`
+	Uptime      int64           `json:"uptime_seconds" example:"3600"`
+	Environment string          `json:"environment" example:"production"`
 	Features    map[string]bool `json:"features"`
-	Limits      SystemLimits   `json:"limits"`
-	Timestamp   time.Time      `json:"timestamp"`
+	Limits      SystemLimits    `json:"limits"`
+	Timestamp   time.Time       `json:"timestamp"`
 }
 
 type SystemLimits struct {
@@ -237,10 +237,10 @@ type SystemLimits struct {
 }
 
 type DetailedHealthResponse struct {
-	Status     string                      `json:"status" example:"healthy"`
-	Components map[string]ComponentHealth  `json:"components"`
-	Checks     []HealthCheck               `json:"checks"`
-	Timestamp  time.Time                   `json:"timestamp"`
+	Status     string                     `json:"status" example:"healthy"`
+	Components map[string]ComponentHealth `json:"components"`
+	Checks     []HealthCheck              `json:"checks"`
+	Timestamp  time.Time                  `json:"timestamp"`
 }
 
 type ComponentHealth struct {

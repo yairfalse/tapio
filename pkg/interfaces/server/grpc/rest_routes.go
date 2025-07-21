@@ -16,9 +16,9 @@ import (
 
 // RESTRoutes provides enhanced REST API routes beyond gRPC-gateway
 type RESTRoutes struct {
-	logger    *zap.Logger
-	grpcAddr  string
-	
+	logger   *zap.Logger
+	grpcAddr string
+
 	// Service references for direct calls (optional optimization)
 	eventService       *EventServer
 	correlationService *CorrelationServer
@@ -47,20 +47,20 @@ func (r *RESTRoutes) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/events/bulk", r.handleBulkEvents)
 	mux.HandleFunc("/api/v1/events/export", r.handleEventExport)
 	mux.HandleFunc("/api/v1/events/search", r.handleEventSearch)
-	
+
 	// Correlation routes
 	mux.HandleFunc("/api/v1/correlations/realtime", r.handleRealtimeCorrelations)
 	mux.HandleFunc("/api/v1/correlations/patterns", r.handlePatternDiscovery)
 	mux.HandleFunc("/api/v1/correlations/impact", r.handleImpactAnalysis)
-	
+
 	// Collector routes
 	mux.HandleFunc("/api/v1/collectors/status", r.handleCollectorStatus)
 	mux.HandleFunc("/api/v1/collectors/config", r.handleCollectorConfig)
-	
+
 	// Analytics routes
 	mux.HandleFunc("/api/v1/analytics/summary", r.handleAnalyticsSummary)
 	mux.HandleFunc("/api/v1/analytics/trends", r.handleTrendAnalysis)
-	
+
 	// System routes
 	mux.HandleFunc("/api/v1/system/info", r.handleSystemInfo)
 	mux.HandleFunc("/api/v1/system/health/detailed", r.handleDetailedHealth)
@@ -73,22 +73,22 @@ func (r *RESTRoutes) handleEventIngest(w http.ResponseWriter, req *http.Request)
 		r.writeError(w, http.StatusMethodNotAllowed, "Only POST method allowed")
 		return
 	}
-	
+
 	// Parse request body
 	var events []EventIngestRequest
 	if err := json.NewDecoder(req.Body).Decode(&events); err != nil {
 		r.writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid JSON: %v", err))
 		return
 	}
-	
+
 	// Process events
 	results := make([]EventIngestResponse, len(events))
 	successCount := 0
-	
+
 	for i, event := range events {
 		// Convert to domain event
 		domainEvent := r.convertIngestToDomainEvent(event)
-		
+
 		// Process through event service if available
 		if r.eventService != nil {
 			// Direct processing for better performance
@@ -118,7 +118,7 @@ func (r *RESTRoutes) handleEventIngest(w http.ResponseWriter, req *http.Request)
 			successCount++
 		}
 	}
-	
+
 	// Return response
 	response := BulkIngestResponse{
 		Total:     len(events),
@@ -127,7 +127,7 @@ func (r *RESTRoutes) handleEventIngest(w http.ResponseWriter, req *http.Request)
 		Results:   results,
 		Timestamp: time.Now(),
 	}
-	
+
 	r.writeJSON(w, http.StatusAccepted, response)
 }
 
@@ -136,14 +136,14 @@ func (r *RESTRoutes) handleBulkEvents(w http.ResponseWriter, req *http.Request) 
 		r.writeError(w, http.StatusMethodNotAllowed, "Only POST method allowed")
 		return
 	}
-	
+
 	// Support NDJSON format for bulk events
 	contentType := req.Header.Get("Content-Type")
 	if strings.Contains(contentType, "application/x-ndjson") {
 		r.handleNDJSONEvents(w, req)
 		return
 	}
-	
+
 	// Regular JSON array
 	r.handleEventIngest(w, req)
 }
@@ -152,7 +152,7 @@ func (r *RESTRoutes) handleNDJSONEvents(w http.ResponseWriter, req *http.Request
 	decoder := json.NewDecoder(req.Body)
 	successCount := 0
 	failedCount := 0
-	
+
 	for {
 		var event EventIngestRequest
 		if err := decoder.Decode(&event); err == io.EOF {
@@ -161,17 +161,17 @@ func (r *RESTRoutes) handleNDJSONEvents(w http.ResponseWriter, req *http.Request
 			failedCount++
 			continue
 		}
-		
+
 		// Process event (simplified)
 		successCount++
 	}
-	
+
 	response := map[string]interface{}{
 		"success": successCount,
 		"failed":  failedCount,
 		"total":   successCount + failedCount,
 	}
-	
+
 	r.writeJSON(w, http.StatusAccepted, response)
 }
 
@@ -180,17 +180,17 @@ func (r *RESTRoutes) handleEventExport(w http.ResponseWriter, req *http.Request)
 		r.writeError(w, http.StatusMethodNotAllowed, "Only GET method allowed")
 		return
 	}
-	
+
 	// Parse query parameters
 	format := req.URL.Query().Get("format")
 	if format == "" {
 		format = "json"
 	}
-	
+
 	startTime := req.URL.Query().Get("start_time")
 	endTime := req.URL.Query().Get("end_time")
 	limit := req.URL.Query().Get("limit")
-	
+
 	// Set appropriate content type
 	switch format {
 	case "csv":
@@ -211,20 +211,20 @@ func (r *RESTRoutes) handleEventSearch(w http.ResponseWriter, req *http.Request)
 		r.writeError(w, http.StatusMethodNotAllowed, "Only POST method allowed")
 		return
 	}
-	
+
 	// Parse search request
 	var searchReq EventSearchRequest
 	if err := json.NewDecoder(req.Body).Decode(&searchReq); err != nil {
 		r.writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid JSON: %v", err))
 		return
 	}
-	
+
 	// Perform search (simplified)
 	results := EventSearchResponse{
-		Query:       searchReq.Query,
-		TotalHits:   100,
+		Query:        searchReq.Query,
+		TotalHits:    100,
 		ReturnedHits: 10,
-		Events:      []EventSearchResult{},
+		Events:       []EventSearchResult{},
 		Facets: map[string][]FacetValue{
 			"type": {
 				{Value: "network", Count: 45},
@@ -239,7 +239,7 @@ func (r *RESTRoutes) handleEventSearch(w http.ResponseWriter, req *http.Request)
 		},
 		Timestamp: time.Now(),
 	}
-	
+
 	r.writeJSON(w, http.StatusOK, results)
 }
 
@@ -250,22 +250,22 @@ func (r *RESTRoutes) handleRealtimeCorrelations(w http.ResponseWriter, req *http
 		r.writeError(w, http.StatusMethodNotAllowed, "Only GET method allowed")
 		return
 	}
-	
+
 	// Set up SSE for real-time correlation updates
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	
+
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		r.writeError(w, http.StatusInternalServerError, "SSE not supported")
 		return
 	}
-	
+
 	// Send correlation updates
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -277,11 +277,11 @@ func (r *RESTRoutes) handleRealtimeCorrelations(w http.ResponseWriter, req *http
 				Description: "Detected service degradation pattern",
 				Timestamp:   time.Now(),
 			}
-			
+
 			data, _ := json.Marshal(correlation)
 			fmt.Fprintf(w, "event: correlation\ndata: %s\n\n", data)
 			flusher.Flush()
-			
+
 		case <-req.Context().Done():
 			return
 		}
@@ -293,14 +293,14 @@ func (r *RESTRoutes) handlePatternDiscovery(w http.ResponseWriter, req *http.Req
 		r.writeError(w, http.StatusMethodNotAllowed, "Only POST method allowed")
 		return
 	}
-	
+
 	// Parse pattern discovery request
 	var patternReq PatternDiscoveryRequest
 	if err := json.NewDecoder(req.Body).Decode(&patternReq); err != nil {
 		r.writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid JSON: %v", err))
 		return
 	}
-	
+
 	// Discover patterns (simplified)
 	response := PatternDiscoveryResponse{
 		TimeRange: patternReq.TimeRange,
@@ -324,7 +324,7 @@ func (r *RESTRoutes) handlePatternDiscovery(w http.ResponseWriter, req *http.Req
 		},
 		Timestamp: time.Now(),
 	}
-	
+
 	r.writeJSON(w, http.StatusOK, response)
 }
 
@@ -333,24 +333,24 @@ func (r *RESTRoutes) handleImpactAnalysis(w http.ResponseWriter, req *http.Reque
 		r.writeError(w, http.StatusMethodNotAllowed, "Only POST method allowed")
 		return
 	}
-	
+
 	// Parse impact analysis request
 	var impactReq ImpactAnalysisRequest
 	if err := json.NewDecoder(req.Body).Decode(&impactReq); err != nil {
 		r.writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid JSON: %v", err))
 		return
 	}
-	
+
 	// Perform impact analysis (simplified)
 	response := ImpactAnalysisResponse{
 		EventID: impactReq.EventID,
 		Impact: ImpactDetails{
-			BusinessImpact:   0.75,
-			CustomerImpact:   0.60,
+			BusinessImpact:    0.75,
+			CustomerImpact:    0.60,
 			OperationalImpact: 0.80,
-			FinancialImpact:  0.45,
+			FinancialImpact:   0.45,
 		},
-		AffectedServices: []string{"api-gateway", "payment-service", "notification-service"},
+		AffectedServices:  []string{"api-gateway", "payment-service", "notification-service"},
 		AffectedCustomers: 1250,
 		EstimatedDuration: "2h30m",
 		Recommendations: []string{
@@ -360,7 +360,7 @@ func (r *RESTRoutes) handleImpactAnalysis(w http.ResponseWriter, req *http.Reque
 		},
 		Timestamp: time.Now(),
 	}
-	
+
 	r.writeJSON(w, http.StatusOK, response)
 }
 
@@ -371,7 +371,7 @@ func (r *RESTRoutes) handleCollectorStatus(w http.ResponseWriter, req *http.Requ
 		r.writeError(w, http.StatusMethodNotAllowed, "Only GET method allowed")
 		return
 	}
-	
+
 	// Get collector status
 	response := CollectorStatusResponse{
 		Collectors: []CollectorStatusDetail{
@@ -406,7 +406,7 @@ func (r *RESTRoutes) handleCollectorStatus(w http.ResponseWriter, req *http.Requ
 		EventsPerSecond: 210.7,
 		Timestamp:       time.Now(),
 	}
-	
+
 	r.writeJSON(w, http.StatusOK, response)
 }
 
@@ -428,7 +428,7 @@ func (r *RESTRoutes) handleAnalyticsSummary(w http.ResponseWriter, req *http.Req
 		r.writeError(w, http.StatusMethodNotAllowed, "Only GET method allowed")
 		return
 	}
-	
+
 	// Generate analytics summary
 	response := AnalyticsSummaryResponse{
 		TimeRange: TimeRange{
@@ -436,10 +436,10 @@ func (r *RESTRoutes) handleAnalyticsSummary(w http.ResponseWriter, req *http.Req
 			End:   time.Now(),
 		},
 		EventStatistics: EventStats{
-			Total:           145892,
-			ByType:          map[string]int64{"network": 45000, "kubernetes": 35000, "system": 30892, "application": 35000},
-			BySeverity:      map[string]int64{"info": 100000, "warning": 35000, "error": 10000, "critical": 892},
-			EventsPerHour:   []int64{5000, 5500, 6000, 6500, 7000, 6800, 6500, 6000},
+			Total:         145892,
+			ByType:        map[string]int64{"network": 45000, "kubernetes": 35000, "system": 30892, "application": 35000},
+			BySeverity:    map[string]int64{"info": 100000, "warning": 35000, "error": 10000, "critical": 892},
+			EventsPerHour: []int64{5000, 5500, 6000, 6500, 7000, 6800, 6500, 6000},
 		},
 		CorrelationStatistics: CorrelationStats{
 			Total:             1523,
@@ -462,7 +462,7 @@ func (r *RESTRoutes) handleAnalyticsSummary(w http.ResponseWriter, req *http.Req
 		},
 		Timestamp: time.Now(),
 	}
-	
+
 	r.writeJSON(w, http.StatusOK, response)
 }
 
@@ -471,18 +471,18 @@ func (r *RESTRoutes) handleTrendAnalysis(w http.ResponseWriter, req *http.Reques
 		r.writeError(w, http.StatusMethodNotAllowed, "Only GET method allowed")
 		return
 	}
-	
+
 	// Parse query parameters
 	metric := req.URL.Query().Get("metric")
 	period := req.URL.Query().Get("period")
-	
+
 	if metric == "" {
 		metric = "events"
 	}
 	if period == "" {
 		period = "1h"
 	}
-	
+
 	// Generate trend analysis
 	response := TrendAnalysisResponse{
 		Metric: metric,
@@ -519,7 +519,7 @@ func (r *RESTRoutes) handleTrendAnalysis(w http.ResponseWriter, req *http.Reques
 		},
 		Timestamp: time.Now(),
 	}
-	
+
 	r.writeJSON(w, http.StatusOK, response)
 }
 
@@ -530,7 +530,7 @@ func (r *RESTRoutes) handleSystemInfo(w http.ResponseWriter, req *http.Request) 
 		r.writeError(w, http.StatusMethodNotAllowed, "Only GET method allowed")
 		return
 	}
-	
+
 	response := SystemInfoResponse{
 		Version:     "1.0.0",
 		BuildTime:   "2024-01-01T00:00:00Z",
@@ -554,7 +554,7 @@ func (r *RESTRoutes) handleSystemInfo(w http.ResponseWriter, req *http.Request) 
 		},
 		Timestamp: time.Now(),
 	}
-	
+
 	r.writeJSON(w, http.StatusOK, response)
 }
 
@@ -563,7 +563,7 @@ func (r *RESTRoutes) handleDetailedHealth(w http.ResponseWriter, req *http.Reque
 		r.writeError(w, http.StatusMethodNotAllowed, "Only GET method allowed")
 		return
 	}
-	
+
 	response := DetailedHealthResponse{
 		Status: "healthy",
 		Components: map[string]ComponentHealth{
@@ -622,7 +622,7 @@ func (r *RESTRoutes) handleDetailedHealth(w http.ResponseWriter, req *http.Reque
 		},
 		Timestamp: time.Now(),
 	}
-	
+
 	r.writeJSON(w, http.StatusOK, response)
 }
 
@@ -630,19 +630,19 @@ func (r *RESTRoutes) handleDetailedHealth(w http.ResponseWriter, req *http.Reque
 
 func (r *RESTRoutes) getCollectorConfig(w http.ResponseWriter, req *http.Request) {
 	collectorName := req.URL.Query().Get("name")
-	
+
 	config := CollectorConfigResponse{
 		Name: collectorName,
 		Config: map[string]interface{}{
-			"enabled":       true,
-			"buffer_size":   10000,
-			"worker_count":  4,
-			"batch_size":    100,
+			"enabled":        true,
+			"buffer_size":    10000,
+			"worker_count":   4,
+			"batch_size":     100,
 			"flush_interval": "5s",
 		},
 		Timestamp: time.Now(),
 	}
-	
+
 	r.writeJSON(w, http.StatusOK, config)
 }
 
@@ -652,13 +652,13 @@ func (r *RESTRoutes) updateCollectorConfig(w http.ResponseWriter, req *http.Requ
 		r.writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid JSON: %v", err))
 		return
 	}
-	
+
 	response := map[string]interface{}{
 		"status":    "updated",
 		"message":   "Configuration updated successfully",
 		"timestamp": time.Now(),
 	}
-	
+
 	r.writeJSON(w, http.StatusOK, response)
 }
 
@@ -673,7 +673,7 @@ func (r *RESTRoutes) exportEventsAsJSON(w io.Writer, startTime, endTime, limit s
 			"message":   "Network connection established",
 		},
 	}
-	
+
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
 	encoder.Encode(events)
@@ -694,7 +694,7 @@ func (r *RESTRoutes) exportEventsAsNDJSON(w io.Writer, startTime, endTime, limit
 		"timestamp": time.Now(),
 		"message":   "Network connection established",
 	}
-	
+
 	encoder := json.NewEncoder(w)
 	encoder.Encode(event)
 }
@@ -718,7 +718,7 @@ func (r *RESTRoutes) convertIngestToDomainEvent(req EventIngestRequest) domain.E
 func (r *RESTRoutes) writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	
+
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(data); err != nil {
@@ -733,6 +733,6 @@ func (r *RESTRoutes) writeError(w http.ResponseWriter, status int, message strin
 		Code:      strconv.Itoa(status),
 		Timestamp: time.Now(),
 	}
-	
+
 	r.writeJSON(w, status, response)
 }

@@ -48,6 +48,9 @@ type Config struct {
 	EventRateLimit     int           `json:"event_rate_limit"`
 	DBusTimeout        time.Duration `json:"dbus_timeout"`
 	MaxConcurrentWatch int           `json:"max_concurrent_watch"`
+
+	// OpenTelemetry integration
+	EnableOTEL bool `json:"enable_otel"` // Enable OpenTelemetry distributed tracing
 }
 
 // Health represents collector health status
