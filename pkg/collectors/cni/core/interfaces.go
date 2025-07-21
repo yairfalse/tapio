@@ -47,6 +47,9 @@ type Config struct {
 	EnableEventMonitoring   bool `json:"enable_event_monitoring"`   // Monitor Kubernetes CNI events
 	EnableFileMonitoring    bool `json:"enable_file_monitoring"`    // Monitor CNI config file changes
 
+	// OpenTelemetry integration
+	EnableOTEL bool `json:"enable_otel"` // Enable OpenTelemetry distributed tracing
+
 	// Plugin-specific configurations
 	CiliumConfig  *CiliumConfig  `json:"cilium_config,omitempty"`
 	CalicoConfig  *CalicoConfig  `json:"calico_config,omitempty"`

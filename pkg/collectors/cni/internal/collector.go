@@ -9,6 +9,8 @@ import (
 
 	"github.com/yairfalse/tapio/pkg/collectors/cni/core"
 	"github.com/yairfalse/tapio/pkg/domain"
+	"github.com/yairfalse/tapio/pkg/integrations/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // CNICollector implements the core.Collector interface
@@ -39,6 +41,9 @@ type CNICollector struct {
 	// Error tracking
 	errors   []error
 	errorsMu sync.Mutex
+
+	// OTEL instrumentation
+	otelInstrumentation *otel.CollectorInstrumentation
 }
 
 // NewCNICollector creates a new CNI collector with the given configuration
@@ -71,8 +76,36 @@ func NewCNICollector(config core.Config) (*CNICollector, error) {
 		return nil, fmt.Errorf("failed to initialize monitors: %w", err)
 	}
 
+	// Initialize OTEL instrumentation
+	if config.EnableOTEL {
+		otelConfig := otel.DefaultConfig()
+		otelConfig.ServiceName = "tapio-cni-collector"
+		otelConfig.ServiceVersion = "1.0.0"
+		otelConfig.Environment = getEnvironment()
+		otelConfig.Enabled = true
+
+		otelIntegration, err := otel.NewSimpleOTEL(otelConfig)
+		if err != nil {
+			// OTEL is optional, just log the error
+			collector.recordError(fmt.Errorf("failed to initialize OTEL: %w", err))
+		} else {
+			collector.otelInstrumentation = otel.NewCollectorInstrumentation(otelIntegration)
+		}
+	}
+
 	collector.updateHealth()
 	return collector, nil
+}
+
+// getEnvironment returns the current environment based on env vars
+func getEnvironment() string {
+	if env := os.Getenv("TAPIO_ENV"); env != "" {
+		return env
+	}
+	if env := os.Getenv("ENVIRONMENT"); env != "" {
+		return env
+	}
+	return "development"
 }
 
 // Start begins CNI monitoring and event collection
@@ -82,6 +115,13 @@ func (c *CNICollector) Start(ctx context.Context) error {
 
 	if c.running {
 		return fmt.Errorf("collector already running")
+	}
+
+	// Create OTEL span for collector startup
+	if c.otelInstrumentation != nil {
+		var span trace.Span
+		ctx, span = c.otelInstrumentation.InstrumentCollectorStart(ctx, "cni")
+		defer span.End()
 	}
 
 	c.ctx, c.cancel = context.WithCancel(ctx)
@@ -271,13 +311,32 @@ func (c *CNICollector) processRawEvents() {
 				return
 			}
 
+			// Create OTEL span for event processing
+			eventCtx := c.ctx
+			if c.otelInstrumentation != nil {
+				// Create a temporary UnifiedEvent for span creation
+				tempEvent := &domain.UnifiedEvent{
+					ID:     rawEvent.ID,
+					Source: string(domain.SourceCNI),
+				}
+				var span trace.Span
+				eventCtx, span = c.otelInstrumentation.InstrumentEventProcessing(eventCtx, tempEvent)
+				defer span.End()
+			}
+
 			// Process the raw event into a UnifiedEvent
-			unifiedEvent, err := c.processor.ProcessEvent(c.ctx, rawEvent)
+			unifiedEvent, err := c.processor.ProcessEvent(eventCtx, rawEvent)
 			if err != nil {
+				if c.otelInstrumentation != nil {
+					c.otelInstrumentation.RecordError(eventCtx, err, "failed to process CNI event")
+				}
 				c.recordError(fmt.Errorf("failed to process event %s: %w", rawEvent.ID, err))
 				c.statistics.EventsDropped++
 				continue
 			}
+
+			// The processor already adds trace context from annotations,
+			// but OTEL instrumentation will enhance it with active span
 
 			// Update statistics
 			c.updateStatistics(rawEvent, unifiedEvent)

@@ -57,6 +57,10 @@ func (p *cniEventProcessor) ProcessEvent(ctx context.Context, raw core.CNIRawEve
 		Impact: p.createImpactContext(raw, severity),
 	}
 
+	// If OTEL span is active in context, it will be enhanced by the collector
+	// The trace context extraction above is for passive extraction from annotations
+	// Active OTEL span creation happens in the collector's processRawEvents
+
 	return unifiedEvent, nil
 }
 
