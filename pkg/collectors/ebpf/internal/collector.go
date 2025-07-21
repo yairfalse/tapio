@@ -3,12 +3,15 @@ package internal
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/yairfalse/tapio/pkg/collectors/ebpf/core"
 	"github.com/yairfalse/tapio/pkg/domain"
+	"github.com/yairfalse/tapio/pkg/integrations/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // collector implements the core.Collector interface
@@ -43,6 +46,9 @@ type collector struct {
 
 	// Platform-specific implementation
 	impl platformImpl
+
+	// OTEL instrumentation
+	otelInstrumentation *otel.CollectorInstrumentation
 }
 
 // platformImpl is the platform-specific interface
@@ -81,7 +87,35 @@ func NewCollector(config core.Config) (core.Collector, error) {
 	c.impl = impl
 	c.lastEventTime.Store(time.Now())
 
+	// Initialize OTEL instrumentation
+	if config.EnableOTEL {
+		otelConfig := otel.DefaultConfig()
+		otelConfig.ServiceName = "tapio-ebpf-collector"
+		otelConfig.ServiceVersion = "1.0.0"
+		otelConfig.Environment = getEnvironment()
+		otelConfig.Enabled = true
+
+		otelIntegration, err := otel.NewSimpleOTEL(otelConfig)
+		if err != nil {
+			// OTEL is optional, just log the error
+			fmt.Printf("Failed to initialize OTEL: %v\n", err)
+		} else {
+			c.otelInstrumentation = otel.NewCollectorInstrumentation(otelIntegration)
+		}
+	}
+
 	return c, nil
+}
+
+// getEnvironment returns the current environment based on env vars
+func getEnvironment() string {
+	if env := os.Getenv("TAPIO_ENV"); env != "" {
+		return env
+	}
+	if env := os.Getenv("ENVIRONMENT"); env != "" {
+		return env
+	}
+	return "development"
 }
 
 // Start begins event collection
@@ -92,6 +126,13 @@ func (c *collector) Start(ctx context.Context) error {
 
 	if c.started.Load() {
 		return core.ErrAlreadyStarted
+	}
+
+	// Create OTEL span for collector startup
+	if c.otelInstrumentation != nil {
+		var span trace.Span
+		ctx, span = c.otelInstrumentation.InstrumentCollectorStart(ctx, "ebpf")
+		defer span.End()
 	}
 
 	// Create cancellable context
@@ -231,9 +272,28 @@ func (c *collector) processEvents() {
 				return
 			}
 
+			// Create OTEL span for event processing
+			eventCtx := c.ctx
+			if c.otelInstrumentation != nil {
+				// Create a temporary domain.Event for span creation
+				tempEvent := &domain.Event{
+					ID:     domain.EventID(fmt.Sprintf("ebpf-%d-%d", rawEvent.PID, rawEvent.Timestamp)),
+					Source: domain.SourceEBPF,
+				}
+				var span trace.Span
+				eventCtx, span = c.otelInstrumentation.InstrumentEventProcessing(eventCtx, &domain.UnifiedEvent{
+					ID:     string(tempEvent.ID),
+					Source: string(tempEvent.Source),
+				})
+				defer span.End()
+			}
+
 			// Process the raw event
-			event, err := c.processor.ProcessEvent(c.ctx, rawEvent)
+			event, err := c.processor.ProcessEvent(eventCtx, rawEvent)
 			if err != nil {
+				if c.otelInstrumentation != nil {
+					c.otelInstrumentation.RecordError(eventCtx, err, "failed to process eBPF event")
+				}
 				c.stats.errorCount.Add(1)
 				continue
 			}
