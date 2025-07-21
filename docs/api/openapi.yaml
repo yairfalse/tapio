@@ -1,0 +1,1121 @@
+openapi: 3.0.3
+info:
+  title: Tapio Observability Platform API
+  description: |
+    Tapio provides enterprise-grade observability with semantic correlation.
+    
+    ## Features
+    - Real-time event streaming with OTEL context
+    - AI-powered semantic correlation
+    - Multi-dimensional root cause analysis
+    - Predictive analytics and business impact assessment
+    
+    ## Authentication
+    API keys or JWT tokens in Authorization header
+    
+    ## Rate Limiting
+    - 10,000 requests per minute per API key
+    - 165,000 events per second for streaming
+  version: 1.0.0
+  contact:
+    name: Tapio Support
+    email: support@tapio.io
+    url: https://tapio.io/support
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+servers:
+  - url: https://api.tapio.io/api/v1
+    description: Production server
+  - url: https://staging-api.tapio.io/api/v1
+    description: Staging server
+  - url: http://localhost:8080/api/v1
+    description: Local development
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+tags:
+  - name: Events
+    description: Event ingestion and querying
+  - name: Correlations
+    description: Correlation and semantic analysis
+  - name: Collectors
+    description: Collector management
+  - name: Analytics
+    description: Analytics and insights
+  - name: System
+    description: System information and health
+
+paths:
+  /events:
+    post:
+      tags:
+        - Events
+      summary: Submit a single event
+      operationId: submitEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventIngestRequest'
+      responses:
+        '202':
+          description: Event accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventIngestResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    
+    get:
+      tags:
+        - Events
+      summary: Query events
+      operationId: queryEvents
+      parameters:
+        - name: filter.time_range.start
+          in: query
+          description: Start time (RFC3339)
+          schema:
+            type: string
+            format: date-time
+        - name: filter.time_range.end
+          in: query
+          description: End time (RFC3339)
+          schema:
+            type: string
+            format: date-time
+        - name: filter.event_types
+          in: query
+          description: Comma-separated event types
+          schema:
+            type: string
+        - name: filter.severities
+          in: query
+          description: Comma-separated severities
+          schema:
+            type: string
+        - name: filter.limit
+          in: query
+          description: Maximum results
+          schema:
+            type: integer
+            default: 100
+            maximum: 10000
+        - name: include_correlations
+          in: query
+          description: Include correlation data
+          schema:
+            type: boolean
+        - name: include_statistics
+          in: query
+          description: Include statistics
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Query results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+                  total_count:
+                    type: integer
+                    format: int64
+                  statistics:
+                    $ref: '#/components/schemas/EventStatistics'
+                  query_time:
+                    type: string
+                    format: date-time
+
+  /events/bulk:
+    post:
+      tags:
+        - Events
+      summary: Submit multiple events
+      operationId: submitBulkEvents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/EventIngestRequest'
+          application/x-ndjson:
+            schema:
+              type: string
+              description: Newline-delimited JSON events
+      responses:
+        '202':
+          description: Events accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkIngestResponse'
+
+  /events/search:
+    post:
+      tags:
+        - Events
+      summary: Advanced event search
+      operationId: searchEvents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventSearchRequest'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventSearchResponse'
+
+  /events/export:
+    get:
+      tags:
+        - Events
+      summary: Export events
+      operationId: exportEvents
+      parameters:
+        - name: format
+          in: query
+          description: Export format
+          schema:
+            type: string
+            enum: [json, csv, ndjson]
+            default: json
+        - name: start_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Exported events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+            text/csv:
+              schema:
+                type: string
+            application/x-ndjson:
+              schema:
+                type: string
+
+  /events/stream:
+    get:
+      tags:
+        - Events
+      summary: Stream real-time events (SSE)
+      operationId: streamEvents
+      parameters:
+        - name: filter
+          in: query
+          description: JSON-encoded filter criteria
+          schema:
+            type: string
+        - name: lookback
+          in: query
+          description: Duration to include historical events
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Event stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  /correlations/analyze:
+    post:
+      tags:
+        - Correlations
+      summary: Analyze events for correlations
+      operationId: analyzeCorrelations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                events:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Event'
+                analysis_type:
+                  type: string
+                  enum: [SEMANTIC, TEMPORAL, CAUSAL]
+                options:
+                  type: object
+                  properties:
+                    include_root_cause:
+                      type: boolean
+                    include_predictions:
+                      type: boolean
+                    confidence_threshold:
+                      type: number
+                      minimum: 0
+                      maximum: 1
+      responses:
+        '202':
+          description: Analysis started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisResponse'
+
+  /correlations:
+    get:
+      tags:
+        - Correlations
+      summary: Get existing correlations
+      operationId: getCorrelations
+      parameters:
+        - name: time_range.start
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: time_range.end
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: pattern_type
+          in: query
+          schema:
+            type: string
+        - name: min_confidence
+          in: query
+          schema:
+            type: number
+            minimum: 0
+            maximum: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Correlations found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  correlations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CorrelationFinding'
+                  total_count:
+                    type: integer
+                    format: int64
+
+  /correlations/patterns:
+    post:
+      tags:
+        - Correlations
+      summary: Discover patterns
+      operationId: discoverPatterns
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatternDiscoveryRequest'
+      responses:
+        '200':
+          description: Discovered patterns
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatternDiscoveryResponse'
+
+  /correlations/impact:
+    post:
+      tags:
+        - Correlations
+      summary: Analyze event impact
+      operationId: analyzeImpact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImpactAnalysisRequest'
+      responses:
+        '200':
+          description: Impact analysis results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImpactAnalysisResponse'
+
+  /collectors:
+    get:
+      tags:
+        - Collectors
+      summary: List collectors
+      operationId: listCollectors
+      responses:
+        '200':
+          description: Collector list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  collectors:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CollectorInfo'
+                  total_count:
+                    type: integer
+
+  /collectors/status:
+    get:
+      tags:
+        - Collectors
+      summary: Get collector status
+      operationId: getCollectorStatus
+      responses:
+        '200':
+          description: Collector status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectorStatusResponse'
+
+  /analytics/summary:
+    get:
+      tags:
+        - Analytics
+      summary: Get analytics summary
+      operationId: getAnalyticsSummary
+      parameters:
+        - name: start_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Analytics summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsSummaryResponse'
+
+  /analytics/trends:
+    get:
+      tags:
+        - Analytics
+      summary: Get trend analysis
+      operationId: getTrendAnalysis
+      parameters:
+        - name: metric
+          in: query
+          schema:
+            type: string
+        - name: period
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Trend analysis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrendAnalysisResponse'
+
+  /system/info:
+    get:
+      tags:
+        - System
+      summary: Get system information
+      operationId: getSystemInfo
+      responses:
+        '200':
+          description: System information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemInfoResponse'
+
+  /health:
+    get:
+      tags:
+        - System
+      summary: Basic health check
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+
+components:
+  schemas:
+    EventIngestRequest:
+      type: object
+      required:
+        - id
+        - type
+        - severity
+        - timestamp
+        - message
+      properties:
+        id:
+          type: string
+          example: evt_001
+        type:
+          type: string
+          example: network
+        severity:
+          type: string
+          enum: [debug, info, warning, error, critical]
+          example: info
+        timestamp:
+          type: string
+          format: date-time
+        message:
+          type: string
+          example: Network connection established
+        service:
+          type: string
+        component:
+          type: string
+        data:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+
+    EventIngestResponse:
+      type: object
+      properties:
+        event_id:
+          type: string
+        status:
+          type: string
+          enum: [accepted, failed]
+        error:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    BulkIngestResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+        success:
+          type: integer
+        failed:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventIngestResponse'
+        timestamp:
+          type: string
+          format: date-time
+
+    Event:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        severity:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        message:
+          type: string
+        context:
+          type: object
+          properties:
+            service:
+              type: string
+            namespace:
+              type: string
+            trace_id:
+              type: string
+            span_id:
+              type: string
+
+    EventSearchRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+        time_range:
+          $ref: '#/components/schemas/TimeRange'
+        filters:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        limit:
+          type: integer
+        offset:
+          type: integer
+        sort_by:
+          type: string
+        sort_order:
+          type: string
+          enum: [asc, desc]
+
+    EventSearchResponse:
+      type: object
+      properties:
+        query:
+          type: string
+        total_hits:
+          type: integer
+          format: int64
+        returned_hits:
+          type: integer
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventSearchResult'
+        facets:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/FacetValue'
+        timestamp:
+          type: string
+          format: date-time
+
+    EventSearchResult:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        severity:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        message:
+          type: string
+        score:
+          type: number
+        highlight:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+    FacetValue:
+      type: object
+      properties:
+        value:
+          type: string
+        count:
+          type: integer
+          format: int64
+
+    CorrelationFinding:
+      type: object
+      properties:
+        id:
+          type: string
+        pattern_type:
+          type: string
+        confidence:
+          type: number
+        timestamp:
+          type: string
+          format: date-time
+        description:
+          type: string
+        related_event_ids:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+
+    PatternDiscoveryRequest:
+      type: object
+      properties:
+        time_range:
+          $ref: '#/components/schemas/TimeRange'
+        min_confidence:
+          type: number
+        pattern_types:
+          type: array
+          items:
+            type: string
+        max_patterns:
+          type: integer
+
+    PatternDiscoveryResponse:
+      type: object
+      properties:
+        time_range:
+          $ref: '#/components/schemas/TimeRange'
+        patterns:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiscoveredPattern'
+        timestamp:
+          type: string
+          format: date-time
+
+    DiscoveredPattern:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        confidence:
+          type: number
+        frequency:
+          type: integer
+        examples:
+          type: array
+          items:
+            type: string
+
+    ImpactAnalysisRequest:
+      type: object
+      required:
+        - event_id
+      properties:
+        event_id:
+          type: string
+        include_services:
+          type: boolean
+        include_metrics:
+          type: boolean
+        time_horizon:
+          type: string
+
+    ImpactAnalysisResponse:
+      type: object
+      properties:
+        event_id:
+          type: string
+        impact:
+          $ref: '#/components/schemas/ImpactDetails'
+        affected_services:
+          type: array
+          items:
+            type: string
+        affected_customers:
+          type: integer
+        estimated_duration:
+          type: string
+        recommendations:
+          type: array
+          items:
+            type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    ImpactDetails:
+      type: object
+      properties:
+        business_impact:
+          type: number
+        customer_impact:
+          type: number
+        operational_impact:
+          type: number
+        financial_impact:
+          type: number
+
+    CollectorInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        last_seen:
+          type: string
+          format: date-time
+        events_processed:
+          type: integer
+          format: int64
+
+    CollectorStatusResponse:
+      type: object
+      properties:
+        collectors:
+          type: array
+          items:
+            $ref: '#/components/schemas/CollectorStatusDetail'
+        total_events:
+          type: integer
+          format: int64
+        events_per_second:
+          type: number
+        timestamp:
+          type: string
+          format: date-time
+
+    CollectorStatusDetail:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        events_per_second:
+          type: number
+        last_event_time:
+          type: string
+          format: date-time
+        uptime_seconds:
+          type: integer
+          format: int64
+        health:
+          $ref: '#/components/schemas/CollectorHealthDetail'
+
+    CollectorHealthDetail:
+      type: object
+      properties:
+        cpu_percent:
+          type: number
+        memory_mb:
+          type: number
+        error_count:
+          type: integer
+          format: int64
+
+    AnalyticsSummaryResponse:
+      type: object
+      properties:
+        time_range:
+          $ref: '#/components/schemas/TimeRange'
+        event_statistics:
+          $ref: '#/components/schemas/EventStats'
+        correlation_statistics:
+          $ref: '#/components/schemas/CorrelationStats'
+        top_issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopIssue'
+        timestamp:
+          type: string
+          format: date-time
+
+    EventStats:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        by_type:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+        by_severity:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+        events_per_hour:
+          type: array
+          items:
+            type: integer
+            format: int64
+
+    CorrelationStats:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        by_pattern:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+        average_confidence:
+          type: number
+
+    TopIssue:
+      type: object
+      properties:
+        description:
+          type: string
+        severity:
+          type: string
+        count:
+          type: integer
+        trend:
+          type: string
+
+    TrendAnalysisResponse:
+      type: object
+      properties:
+        metric:
+          type: string
+        period:
+          type: string
+        trends:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrendData'
+        prediction:
+          $ref: '#/components/schemas/PredictionData'
+        anomalies:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnomalyData'
+        timestamp:
+          type: string
+          format: date-time
+
+    TrendData:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        value:
+          type: number
+        trend:
+          type: string
+
+    PredictionData:
+      type: object
+      properties:
+        next_value:
+          type: number
+        confidence:
+          type: number
+        trend:
+          type: string
+
+    AnomalyData:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        value:
+          type: number
+        description:
+          type: string
+        severity:
+          type: string
+
+    SystemInfoResponse:
+      type: object
+      properties:
+        version:
+          type: string
+        build_time:
+          type: string
+        git_commit:
+          type: string
+        go_version:
+          type: string
+        platform:
+          type: string
+        start_time:
+          type: string
+          format: date-time
+        uptime_seconds:
+          type: integer
+          format: int64
+        environment:
+          type: string
+        features:
+          type: object
+          additionalProperties:
+            type: boolean
+        limits:
+          $ref: '#/components/schemas/SystemLimits'
+        timestamp:
+          type: string
+          format: date-time
+
+    SystemLimits:
+      type: object
+      properties:
+        max_events_per_second:
+          type: integer
+        max_correlations_active:
+          type: integer
+        max_subscriptions:
+          type: integer
+        max_request_size_bytes:
+          type: integer
+
+    AnalysisResponse:
+      type: object
+      properties:
+        analysis_id:
+          type: string
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/CorrelationFinding'
+        status:
+          type: string
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        event_count:
+          type: integer
+
+    EventStatistics:
+      type: object
+      properties:
+        time_range:
+          $ref: '#/components/schemas/TimeRange'
+        total_events:
+          type: integer
+          format: int64
+        events_by_type:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+
+    TimeRange:
+      type: object
+      properties:
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
