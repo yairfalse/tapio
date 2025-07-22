@@ -105,7 +105,7 @@ func runCollector(cmd *cobra.Command, args []string) error {
 			ebpfAdapter := &EBPFCollectorAdapter{
 				collector:     collector,
 				serverAddress: serverAddress,
-				eventChan:     make(chan domain.Event, 1000),
+				eventChan:     make(chan domain.UnifiedEvent, 1000),
 			}
 
 			if err := ebpfAdapter.Start(ctx); err != nil {
@@ -205,13 +205,20 @@ func runCollector(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to start server bridge: %w", err)
 	}
 
+	// Create event converter for backward compatibility
+	converter := domain.NewEventConverter()
+
 	// Route events from collectors through OTEL semantic correlation
 	go func() {
-		for event := range manager.Events() {
-			select {
-			case inputEvents <- event:
-			case <-ctx.Done():
-				return
+		for unifiedEvent := range manager.Events() {
+			// Convert UnifiedEvent to Event for dataflow compatibility
+			event := converter.FromUnifiedEvent(&unifiedEvent)
+			if event != nil {
+				select {
+				case inputEvents <- *event:
+				case <-ctx.Done():
+					return
+				}
 			}
 		}
 	}()
@@ -299,7 +306,7 @@ func initOTEL(ctx context.Context) (*sdktrace.TracerProvider, error) {
 // CollectorManager manages multiple collectors
 type CollectorManager struct {
 	collectors map[string]Collector
-	eventChan  chan domain.Event
+	eventChan  chan domain.UnifiedEvent
 	ctx        context.Context
 	cancel     context.CancelFunc
 }
@@ -308,7 +315,7 @@ type CollectorManager struct {
 type Collector interface {
 	Start(ctx context.Context) error
 	Stop() error
-	Events() <-chan domain.Event
+	Events() <-chan domain.UnifiedEvent
 	Health() domain.HealthStatus
 }
 
@@ -316,7 +323,7 @@ type Collector interface {
 func NewCollectorManager() *CollectorManager {
 	return &CollectorManager{
 		collectors: make(map[string]Collector),
-		eventChan:  make(chan domain.Event, 10000),
+		eventChan:  make(chan domain.UnifiedEvent, 10000),
 	}
 }
 
@@ -366,7 +373,7 @@ func (cm *CollectorManager) Stop() {
 }
 
 // Events returns the merged event channel
-func (cm *CollectorManager) Events() <-chan domain.Event {
+func (cm *CollectorManager) Events() <-chan domain.UnifiedEvent {
 	return cm.eventChan
 }
 
@@ -388,8 +395,7 @@ func (cm *CollectorManager) Statistics() struct {
 type EBPFCollectorAdapter struct {
 	collector     ebpf.Collector
 	serverAddress string
-	eventChan     chan domain.Event
-	processor     *ebpf.DualPathProcessor
+	eventChan     chan domain.UnifiedEvent
 	ctx           context.Context
 	cancel        context.CancelFunc
 }
@@ -403,27 +409,8 @@ func (a *EBPFCollectorAdapter) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to start eBPF collector: %w", err)
 	}
 
-	// Create dual-path processor with gRPC connection
-	processorConfig := &ebpf.ProcessorConfig{
-		RawBufferSize:      10000,
-		SemanticBufferSize: 5000,
-		WorkerCount:        4,
-		BatchSize:          100,
-		FlushInterval:      time.Second,
-		EnableRawPath:      false, // Disable raw path for production
-		EnableSemanticPath: true,  // Enable semantic correlation path
-		RawRetentionPeriod: 1 * time.Hour,
-		RawStorageBackend:  "memory",
-		SemanticBatchSize:  50,
-		TapioServerAddr:    a.serverAddress,   // Connect to gRPC server
-		MaxMemoryUsage:     512 * 1024 * 1024, // 512MB
-		MetricsInterval:    30 * time.Second,
-	}
-
-	a.processor = ebpf.NewDualPathProcessor(processorConfig)
-	if err := a.processor.Start(); err != nil {
-		return fmt.Errorf("failed to start eBPF processor: %w", err)
-	}
+	// Note: The eBPF collector already handles event processing internally
+	// We just need to bridge the events to our channel
 
 	// Bridge events from collector to processor and output channel
 	go func() {
@@ -435,23 +422,8 @@ func (a *EBPFCollectorAdapter) Start(ctx context.Context) error {
 					return
 				}
 
-				// Convert domain.Event to RawEvent for processor
-				rawEvent := &ebpf.RawEvent{
-					Type:      ebpf.EventTypeProcess,
-					Timestamp: uint64(event.Timestamp.UnixNano()),
-					PID:       uint32(event.Context.PID),
-					UID:       uint32(event.Context.UID),
-					GID:       uint32(event.Context.GID),
-					Comm:      event.Context.Comm,
-					Details:   event.Data,
-				}
-
-				// Process through dual-path processor (includes gRPC sending)
-				if err := a.processor.ProcessRawEvent(rawEvent); err != nil {
-					log.Printf("Error processing eBPF event: %v", err)
-				}
-
-				// Also send to local event channel for dataflow
+				// The event is already a UnifiedEvent from the eBPF collector
+				// Just pass it through to the event channel
 				select {
 				case a.eventChan <- event:
 				case <-a.ctx.Done():
@@ -473,40 +445,32 @@ func (a *EBPFCollectorAdapter) Stop() error {
 		a.cancel()
 	}
 
-	var errs []error
-
-	if a.processor != nil {
-		if err := a.processor.Stop(); err != nil {
-			errs = append(errs, fmt.Errorf("processor stop error: %w", err))
-		}
-	}
-
 	if err := a.collector.Stop(); err != nil {
-		errs = append(errs, fmt.Errorf("collector stop error: %w", err))
-	}
-
-	if len(errs) > 0 {
-		return fmt.Errorf("stop errors: %v", errs)
+		return fmt.Errorf("failed to stop collector: %w", err)
 	}
 
 	return nil
 }
 
 // Events returns the event channel
-func (a *EBPFCollectorAdapter) Events() <-chan domain.Event {
+func (a *EBPFCollectorAdapter) Events() <-chan domain.UnifiedEvent {
 	return a.eventChan
 }
 
 // Health returns the health status
 func (a *EBPFCollectorAdapter) Health() domain.HealthStatus {
 	// Get health from underlying collector
-	if healthProvider, ok := a.collector.(interface{ Health() domain.HealthStatus }); ok {
-		return healthProvider.Health()
-	}
+	health := a.collector.Health()
 
-	// Fallback to basic health
-	return domain.HealthStatus{
-		Status:  "healthy",
-		Message: "eBPF adapter running",
+	// Convert from ebpf.Health to domain.HealthStatus
+	switch health.Status {
+	case ebpf.HealthStatusHealthy:
+		return domain.HealthHealthy
+	case ebpf.HealthStatusDegraded:
+		return domain.HealthDegraded
+	case ebpf.HealthStatusUnhealthy:
+		return domain.HealthUnhealthy
+	default:
+		return domain.HealthUnknown
 	}
 }

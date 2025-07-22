@@ -64,12 +64,12 @@ func TestTapioGRPCClient_SendEvent(t *testing.T) {
 			Message: "Service nginx.service started successfully",
 			Level:   "info",
 			Custom: map[string]interface{}{
-				"unit_name":  "nginx.service",
-				"unit_type":  "service",
-				"old_state":  "inactive",
-				"new_state":  "active",
-				"result":     "success",
-				"exit_code":  0,
+				"unit_name": "nginx.service",
+				"unit_type": "service",
+				"old_state": "inactive",
+				"new_state": "active",
+				"result":    "success",
+				"exit_code": 0,
 			},
 		},
 	}

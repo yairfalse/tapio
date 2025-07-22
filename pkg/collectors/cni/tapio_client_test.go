@@ -71,13 +71,13 @@ func TestTapioGRPCClient_SendEvent(t *testing.T) {
 			DestPort:   80,
 		},
 		Kubernetes: &domain.KubernetesData{
-			EventType:   "Normal",
-			Reason:      "NetworkReady",
-			Message:     "Pod network configured successfully",
-			Action:      "ADDED",
-			ObjectKind:  "Pod",
-			Object:      "pod/test-pod-123",
-			APIVersion:  "v1",
+			EventType:  "Normal",
+			Reason:     "NetworkReady",
+			Message:    "Pod network configured successfully",
+			Action:     "ADDED",
+			ObjectKind: "Pod",
+			Object:     "pod/test-pod-123",
+			APIVersion: "v1",
 		},
 	}
 
@@ -128,9 +128,9 @@ func TestTapioGRPCClient_SendBatch(t *testing.T) {
 				Confidence: 0.9,
 			},
 			Network: &domain.NetworkData{
-				SourceIP:   fmt.Sprintf("10.244.%d.%d", i/254, i%254+1),
-				Protocol:   "TCP",
-				Direction:  "ingress",
+				SourceIP:  fmt.Sprintf("10.244.%d.%d", i/254, i%254+1),
+				Protocol:  "TCP",
+				Direction: "ingress",
 			},
 		}
 	}

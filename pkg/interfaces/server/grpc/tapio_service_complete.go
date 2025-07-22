@@ -836,7 +836,7 @@ func (s *TapioServiceComplete) convertProtoToUnifiedEvent(event *pb.Event) (*dom
 func (s *TapioServiceComplete) convertUnifiedEventToProto(event *domain.UnifiedEvent) (*pb.Event, error) {
 	// First convert UnifiedEvent to domain.Event using the EventConverter
 	domainEvent := s.converter.FromUnifiedEvent(event)
-	
+
 	// Then convert domain.Event to pb.Event
 	pe := &pb.Event{
 		Id:        string(domainEvent.ID),
@@ -864,8 +864,8 @@ func (s *TapioServiceComplete) convertUnifiedEventToProto(event *domain.UnifiedE
 	if domainEvent.Data != nil {
 		dataStruct, err := structpb.NewStruct(domainEvent.Data)
 		if err != nil {
-			s.logger.Warn("Failed to convert event data to struct", 
-				zap.Error(err), 
+			s.logger.Warn("Failed to convert event data to struct",
+				zap.Error(err),
 				zap.String("event_id", pe.Id))
 		} else {
 			pe.Data = dataStruct

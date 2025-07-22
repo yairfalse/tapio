@@ -652,7 +652,7 @@ func (c *TapioGRPCClient) extractMessage(event *domain.UnifiedEvent) string {
 	// Construct message from network data if available
 	if event.Network != nil {
 		if event.Network.Protocol != "" && event.Network.SourceIP != "" {
-			return fmt.Sprintf("Network traffic: %s from %s to %s", 
+			return fmt.Sprintf("Network traffic: %s from %s to %s",
 				event.Network.Protocol, event.Network.SourceIP, event.Network.DestIP)
 		}
 	}

@@ -232,7 +232,6 @@ func main() {
 	fmt.Println("Collector stopped successfully")
 }
 
-
 func getHostname() string {
 	hostname, err := os.Hostname()
 	if err != nil {
