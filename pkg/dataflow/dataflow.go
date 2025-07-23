@@ -8,7 +8,7 @@ import (
 
 	"github.com/yairfalse/tapio/pkg/domain"
 	"github.com/yairfalse/tapio/pkg/intelligence/correlation"
-	otelpkg "github.com/yairfalse/tapio/pkg/otel"
+	otelpkg "github.com/yairfalse/tapio/pkg/integrations/otel"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
