@@ -19,30 +19,15 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// CorrelationEngine defines the interface for correlation analysis
-type CorrelationEngine interface {
-	// GetSemanticGroups retrieves semantic groups based on filter
-	GetSemanticGroups(ctx context.Context, filter *pb.Filter) ([]*pb.SemanticGroup, error)
-
-	// AnalyzeEvents performs correlation analysis on events
-	AnalyzeEvents(ctx context.Context, events []*domain.UnifiedEvent) ([]*pb.Correlation, error)
-
-	// Start initializes the correlation engine
-	Start() error
-
-	// Stop gracefully shuts down the correlation engine
-	Stop() error
-}
-
 // CorrelationServiceImpl implements the CorrelationService
 type CorrelationServiceImpl struct {
 	pb.UnimplementedCorrelationServiceServer
 
 	// Dependencies
-	logger               *zap.Logger
-	tracer               trace.Tracer
-	correlationEngine    CorrelationEngine
-	pipelineIntegration  *pipeline.PipelineIntegration
+	logger                *zap.Logger
+	tracer                trace.Tracer
+	correlationEngine     CorrelationEngine
+	pipelineIntegration   *pipeline.PipelineIntegration
 	realtimeEventPipeline *pipeline.RealtimeEventPipeline
 
 	// Configuration
@@ -156,9 +141,9 @@ func (cs *CorrelationServiceImpl) GetCorrelations(ctx context.Context, req *pb.G
 		TotalCount:    int64(len(correlations)),
 		NextPageToken: "", // TODO: Implement pagination
 		Metadata: map[string]string{
-			"query_time":    time.Now().Format(time.RFC3339),
-			"service_type":  "correlation",
-			"result_count":  fmt.Sprintf("%d", len(correlations)),
+			"query_time":   time.Now().Format(time.RFC3339),
+			"service_type": "correlation",
+			"result_count": fmt.Sprintf("%d", len(correlations)),
 		},
 	}, nil
 }
@@ -206,8 +191,8 @@ func (cs *CorrelationServiceImpl) AnalyzeEvents(ctx context.Context, req *pb.Ana
 
 	// Validate request
 	if len(req.EventIds) > cs.config.MaxEventsPerAnalysis {
-		return nil, status.Errorf(codes.InvalidArgument, 
-			"too many events requested: %d (max: %d)", 
+		return nil, status.Errorf(codes.InvalidArgument,
+			"too many events requested: %d (max: %d)",
 			len(req.EventIds), cs.config.MaxEventsPerAnalysis)
 	}
 
@@ -248,8 +233,8 @@ func (cs *CorrelationServiceImpl) AnalyzeEvents(ctx context.Context, req *pb.Ana
 		AnalysisDuration: durationpb.New(analysisEnd.Sub(analysisStart)),
 		EventsAnalyzed:   int32(len(events)),
 		Metadata: map[string]string{
-			"analysis_time":   analysisEnd.Format(time.RFC3339),
-			"events_count":    fmt.Sprintf("%d", len(events)),
+			"analysis_time":      analysisEnd.Format(time.RFC3339),
+			"events_count":       fmt.Sprintf("%d", len(events)),
 			"correlations_count": fmt.Sprintf("%d", len(correlations)),
 		},
 	}
@@ -281,8 +266,8 @@ func (cs *CorrelationServiceImpl) SubscribeToCorrelations(req *pb.SubscribeToCor
 	// Check subscription limits
 	activeCount := cs.subscriptionsActive.Load()
 	if int(activeCount) >= cs.config.MaxSubscriptions {
-		return status.Errorf(codes.ResourceExhausted, 
-			"too many active subscriptions: %d (max: %d)", 
+		return status.Errorf(codes.ResourceExhausted,
+			"too many active subscriptions: %d (max: %d)",
 			activeCount, cs.config.MaxSubscriptions)
 	}
 
@@ -362,9 +347,9 @@ func (cs *CorrelationServiceImpl) GetRecommendedActions(ctx context.Context, req
 		Actions:       allActions,
 		CorrelationId: correlationID,
 		Metadata: map[string]string{
-			"generated_at":     time.Now().Format(time.RFC3339),
+			"generated_at":       time.Now().Format(time.RFC3339),
 			"correlations_count": fmt.Sprintf("%d", len(correlationsResp.Correlations)),
-			"actions_count":    fmt.Sprintf("%d", len(allActions)),
+			"actions_count":      fmt.Sprintf("%d", len(allActions)),
 		},
 	}, nil
 }
@@ -374,7 +359,7 @@ func (cs *CorrelationServiceImpl) GetRecommendedActions(ctx context.Context, req
 func (cs *CorrelationServiceImpl) getCorrelationsByIDs(ctx context.Context, ids []string) ([]*pb.Correlation, error) {
 	// TODO: Implement with actual correlation engine
 	correlations := make([]*pb.Correlation, 0, len(ids))
-	
+
 	for _, id := range ids {
 		// Mock correlation for now
 		correlation := &pb.Correlation{
@@ -392,7 +377,7 @@ func (cs *CorrelationServiceImpl) getCorrelationsByIDs(ctx context.Context, ids 
 		}
 		correlations = append(correlations, correlation)
 	}
-	
+
 	return correlations, nil
 }
 
@@ -442,7 +427,7 @@ func (cs *CorrelationServiceImpl) getEventsForAnalysis(ctx context.Context, req 
 	// TODO: Implement event retrieval from event store
 	// For now, create mock events
 	events := make([]*domain.UnifiedEvent, 0, len(req.EventIds))
-	
+
 	for _, eventID := range req.EventIds {
 		event := &domain.UnifiedEvent{
 			ID:        eventID,
@@ -453,7 +438,7 @@ func (cs *CorrelationServiceImpl) getEventsForAnalysis(ctx context.Context, req 
 		}
 		events = append(events, event)
 	}
-	
+
 	return events, nil
 }
 
@@ -541,15 +526,15 @@ func (cs *CorrelationServiceImpl) generatePredictions(correlations []*pb.Correla
 func (cs *CorrelationServiceImpl) generateImpactAssessment(correlations []*pb.Correlation) *pb.ImpactAssessment {
 	// TODO: Implement business impact assessment
 	return &pb.ImpactAssessment{
-		Level:                  pb.ImpactAssessment_IMPACT_LEVEL_HIGH,
-		BusinessImpactScore:    0.8,
-		TechnicalImpactScore:   0.9,
-		AffectedServices:       []string{"payment-service", "user-service"},
-		AffectedUsers:          1500,
-		AffectedRequests:       50000,
-		EstimatedCost:          25000.0,
-		Currency:               "USD",
-		CascadeProbability:     0.6,
+		Level:                   pb.ImpactAssessment_IMPACT_LEVEL_HIGH,
+		BusinessImpactScore:     0.8,
+		TechnicalImpactScore:    0.9,
+		AffectedServices:        []string{"payment-service", "user-service"},
+		AffectedUsers:           1500,
+		AffectedRequests:        50000,
+		EstimatedCost:           25000.0,
+		Currency:                "USD",
+		CascadeProbability:      0.6,
 		PotentialCascadeTargets: []string{"order-service", "inventory-service"},
 	}
 }
@@ -568,22 +553,22 @@ func (cs *CorrelationServiceImpl) generateRecommendedActions(correlation *pb.Cor
 				"service":  "payment-service",
 				"replicas": "5",
 			},
-			ExpectedResult:   "Reduced response time and error rate",
+			ExpectedResult:    "Reduced response time and error rate",
 			EstimatedDuration: durationpb.New(2 * time.Minute),
-			RiskLevel:        "low",
-			RiskDescription:  "Minimal risk - standard scaling operation",
+			RiskLevel:         "low",
+			RiskDescription:   "Minimal risk - standard scaling operation",
 		},
 		{
-			Id:          "action-2",
-			Title:       "Investigate Memory Leak",
-			Description: "Deep dive into memory usage patterns",
-			Type:        pb.RecommendedAction_ACTION_TYPE_INVESTIGATE,
-			Priority:    pb.RecommendedAction_PRIORITY_MEDIUM,
-			Commands:    []string{"kubectl exec -it payment-service -- heap-dump"},
-			ExpectedResult:   "Identify source of memory leak",
+			Id:                "action-2",
+			Title:             "Investigate Memory Leak",
+			Description:       "Deep dive into memory usage patterns",
+			Type:              pb.RecommendedAction_ACTION_TYPE_INVESTIGATE,
+			Priority:          pb.RecommendedAction_PRIORITY_MEDIUM,
+			Commands:          []string{"kubectl exec -it payment-service -- heap-dump"},
+			ExpectedResult:    "Identify source of memory leak",
 			EstimatedDuration: durationpb.New(15 * time.Minute),
-			RiskLevel:        "medium",
-			RiskDescription:  "May temporarily impact service performance",
+			RiskLevel:         "medium",
+			RiskDescription:   "May temporarily impact service performance",
 		},
 	}
 }
@@ -591,11 +576,11 @@ func (cs *CorrelationServiceImpl) generateRecommendedActions(correlation *pb.Cor
 // GetStatistics returns service statistics
 func (cs *CorrelationServiceImpl) GetStatistics() map[string]interface{} {
 	return map[string]interface{}{
-		"correlations_queried":    cs.correlationsQueried.Load(),
-		"subscriptions_active":    cs.subscriptionsActive.Load(),
-		"events_analyzed":         cs.eventsAnalyzed.Load(),
-		"recommendations_served":  cs.recommendationsServed.Load(),
-		"uptime":                  time.Since(cs.startTime).String(),
-		"service_type":            "correlation",
+		"correlations_queried":   cs.correlationsQueried.Load(),
+		"subscriptions_active":   cs.subscriptionsActive.Load(),
+		"events_analyzed":        cs.eventsAnalyzed.Load(),
+		"recommendations_served": cs.recommendationsServed.Load(),
+		"uptime":                 time.Since(cs.startTime).String(),
+		"service_type":           "correlation",
 	}
 }
