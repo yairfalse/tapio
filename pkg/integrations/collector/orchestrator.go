@@ -79,7 +79,7 @@ func (c *Config) Validate() error {
 	if c.Environment == "" {
 		c.Environment = "production"
 	}
-	if c.CorrelationMode != "semantic" && c.CorrelationMode != "basic" {
+	if c.CorrelationMode != "semantic" && c.CorrelationMode != "basic" && c.CorrelationMode != "ring-buffer" {
 		c.CorrelationMode = "semantic"
 	}
 	return nil
@@ -326,6 +326,8 @@ func (ma *ManagerAdapter) Health() domain.HealthStatus {
 func (o *Orchestrator) Statistics() struct {
 	ActiveCollectors  int
 	ProcessedEvents   int64
+	CorrelatedEvents  int64
+	DroppedEvents     int64
 	BufferUtilization float64
 	Throughput        float64
 } {
@@ -347,6 +349,8 @@ func (o *Orchestrator) Statistics() struct {
 	return struct {
 		ActiveCollectors  int
 		ProcessedEvents   int64
+		CorrelatedEvents  int64
+		DroppedEvents     int64
 		BufferUtilization float64
 		Throughput        float64
 	}{

@@ -77,6 +77,7 @@ func (a *EBPFCollectorAdapter) processEvents() {
 				comm = event.Kernel.Comm
 			}
 
+			// Use attributes as details if available
 			if event.Attributes != nil {
 				details = event.Attributes
 			}
@@ -95,6 +96,7 @@ func (a *EBPFCollectorAdapter) processEvents() {
 				log.Printf("eBPF event processing error: %v", err)
 			}
 
+			// Event is already UnifiedEvent, so pass it along
 			select {
 			case a.eventChan <- event:
 			case <-a.ctx.Done():
