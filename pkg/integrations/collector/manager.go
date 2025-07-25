@@ -13,14 +13,14 @@ import (
 type Collector interface {
 	Start(ctx context.Context) error
 	Stop() error
-	Events() <-chan domain.Event
+	Events() <-chan domain.UnifiedEvent
 	Health() domain.HealthStatus
 }
 
 // CollectorManager orchestrates multiple collectors and aggregates their events
 type CollectorManager struct {
 	collectors    map[string]Collector
-	eventChan     chan domain.Event
+	eventChan     chan domain.UnifiedEvent
 	totalEvents   int64
 	droppedEvents int64
 	ctx           context.Context
@@ -39,7 +39,7 @@ type Statistics struct {
 func NewCollectorManager() *CollectorManager {
 	return &CollectorManager{
 		collectors: make(map[string]Collector),
-		eventChan:  make(chan domain.Event, 10000),
+		eventChan:  make(chan domain.UnifiedEvent, 10000),
 	}
 }
 
@@ -110,7 +110,7 @@ func (cm *CollectorManager) Stop() {
 }
 
 // Events returns the aggregated event channel from all collectors
-func (cm *CollectorManager) Events() <-chan domain.Event {
+func (cm *CollectorManager) Events() <-chan domain.UnifiedEvent {
 	return cm.eventChan
 }
 
@@ -135,29 +135,50 @@ func (cm *CollectorManager) Statistics() Statistics {
 // Health returns aggregated health status of all collectors
 func (cm *CollectorManager) Health() domain.HealthStatus {
 	if len(cm.collectors) == 0 {
-		return domain.HealthStatus{
-			Status:  "unhealthy",
-			Message: "no collectors registered",
-		}
+		return domain.NewHealthStatus(domain.HealthUnhealthy, "No collectors registered", nil)
 	}
 
 	healthyCount := 0
-	for _, collector := range cm.collectors {
+	degradedCount := 0
+	unhealthyCount := 0
+	details := make(map[string]interface{})
+	collectorStatuses := make(map[string]string)
+
+	for name, collector := range cm.collectors {
 		health := collector.Health()
-		if health.Status == "healthy" {
+		status := health.Status()
+		collectorStatuses[name] = string(status)
+
+		switch status {
+		case domain.HealthHealthy:
 			healthyCount++
+		case domain.HealthDegraded:
+			degradedCount++
+		case domain.HealthUnhealthy:
+			unhealthyCount++
 		}
 	}
 
-	status := "healthy"
-	if healthyCount == 0 {
-		status = "unhealthy"
-	} else if healthyCount < len(cm.collectors) {
-		status = "degraded"
+	details["collectors"] = collectorStatuses
+	details["healthy_count"] = healthyCount
+	details["degraded_count"] = degradedCount
+	details["unhealthy_count"] = unhealthyCount
+	details["total_count"] = len(cm.collectors)
+
+	var status domain.HealthStatusValue
+	var message string
+
+	if healthyCount == len(cm.collectors) {
+		status = domain.HealthHealthy
+		message = fmt.Sprintf("All %d collectors are healthy", len(cm.collectors))
+	} else if healthyCount > 0 || degradedCount > 0 {
+		status = domain.HealthDegraded
+		message = fmt.Sprintf("System degraded: %d healthy, %d degraded, %d unhealthy collectors",
+			healthyCount, degradedCount, unhealthyCount)
+	} else {
+		status = domain.HealthUnhealthy
+		message = fmt.Sprintf("All %d collectors are unhealthy", len(cm.collectors))
 	}
 
-	return domain.HealthStatus{
-		Status:  status,
-		Message: fmt.Sprintf("%d/%d collectors healthy", healthyCount, len(cm.collectors)),
-	}
+	return domain.NewHealthStatus(status, message, details)
 }

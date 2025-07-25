@@ -87,14 +87,11 @@ func (c *Config) Validate() error {
 
 // Orchestrator orchestrates the complete collection pipeline
 type Orchestrator struct {
-	config       *Config
-	manager      *CollectorManager
-	dataFlow     *dataflow.TapioDataFlow
-	bridge       *dataflow.ServerBridge
-	tracer       *sdktrace.TracerProvider
-	inputEvents  chan domain.Event
-	outputEvents chan domain.Event
-	eventCount   int64
+	config     *Config
+	manager    *CollectorManager
+	pipeline   *pipeline.UnifiedOrchestrator
+	tracer     *sdktrace.TracerProvider
+	eventCount int64
 }
 
 // New creates a collector orchestrator with validated configuration
@@ -104,9 +101,7 @@ func New(config *Config) (*Orchestrator, error) {
 	}
 
 	return &Orchestrator{
-		config:       config,
-		inputEvents:  make(chan domain.Event, config.BufferSize),
-		outputEvents: make(chan domain.Event, config.BufferSize),
+		config: config,
 	}, nil
 }
 
@@ -125,32 +120,19 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 		return fmt.Errorf("collector initialization failed: %w", err)
 	}
 
-	dataFlowConfig := dataflow.Config{
-		EnableSemanticGrouping: o.config.CorrelationMode == "semantic",
-		GroupRetentionPeriod:   30 * time.Minute,
-		ServiceName:            o.config.ServiceName,
-		ServiceVersion:         o.config.ServiceVersion,
-		Environment:            o.config.Environment,
-		BufferSize:             o.config.BufferSize,
-		FlushInterval:          o.config.FlushInterval,
-	}
+	// Create unified orchestrator configuration
+	orchestratorConfig := pipeline.DefaultUnifiedConfig()
+	orchestratorConfig.BufferSize = o.config.BufferSize
+	orchestratorConfig.EnableCorrelation = o.config.CorrelationMode == "semantic"
+	orchestratorConfig.ProcessingTimeout = 5 * time.Second
+	orchestratorConfig.ShutdownTimeout = 30 * time.Second
 
-	o.dataFlow = dataflow.NewTapioDataFlow(dataFlowConfig)
-	o.dataFlow.Connect(o.inputEvents, o.outputEvents)
-
-	bridgeConfig := dataflow.BridgeConfig{
-		ServerAddress: o.config.ServerAddress,
-		BufferSize:    o.config.BufferSize / 2,
-		FlushInterval: o.config.FlushInterval * 2,
-		MaxBatchSize:  100,
-		EnableTracing: true,
-	}
-
-	bridge, err := dataflow.NewServerBridge(bridgeConfig, o.dataFlow)
+	// Create the unified orchestrator
+	orchestrator, err := pipeline.NewUnifiedOrchestrator(orchestratorConfig)
 	if err != nil {
-		return fmt.Errorf("server bridge creation failed: %w", err)
+		return fmt.Errorf("failed to create unified orchestrator: %w", err)
 	}
-	o.bridge = bridge
+	o.pipeline = orchestrator
 
 	log.Printf("🚀 Starting Tapio Collector %s", o.config.ServiceVersion)
 	log.Printf("   Server: %s", o.config.ServerAddress)
@@ -161,16 +143,17 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 		return fmt.Errorf("collector manager start failed: %w", err)
 	}
 
-	if err := o.dataFlow.Start(); err != nil {
-		return fmt.Errorf("data flow start failed: %w", err)
+	// Start the unified pipeline without direct collector integration
+	// We'll bridge events from manager to pipeline instead
+	if err := o.pipeline.Start(ctx); err != nil {
+		return fmt.Errorf("pipeline start failed: %w", err)
 	}
 
-	if err := o.bridge.Start(); err != nil {
-		return fmt.Errorf("server bridge start failed: %w", err)
-	}
+	// Bridge events from collector manager to pipeline
+	go o.bridgeEvents(ctx)
 
-	go o.routeCollectorEvents(ctx)
-	go o.processCorrelatedEvents(ctx)
+	// Process events from the pipeline
+	go o.processEvents(ctx)
 
 	log.Printf("✅ Tapio Collector operational")
 
@@ -178,10 +161,9 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 
 	log.Printf("🛑 Shutting down...")
 	o.manager.Stop()
-	o.dataFlow.Stop()
-	o.bridge.Stop()
-	close(o.inputEvents)
-	close(o.outputEvents)
+	if o.pipeline != nil {
+		o.pipeline.Stop()
+	}
 
 	log.Printf("👋 Tapio Collector stopped")
 	return nil
@@ -226,7 +208,7 @@ func (o *Orchestrator) initCollectors(ctx context.Context) error {
 			adapter := &EBPFCollectorAdapter{
 				collector:     collector,
 				serverAddress: o.config.ServerAddress,
-				eventChan:     make(chan domain.Event, 1000),
+				eventChan:     make(chan domain.UnifiedEvent, 1000),
 			}
 
 			if err := adapter.Start(ctx); err != nil {
@@ -249,44 +231,95 @@ func (o *Orchestrator) initCollectors(ctx context.Context) error {
 	return nil
 }
 
-// routeCollectorEvents routes raw events from collectors to correlation pipeline
-func (o *Orchestrator) routeCollectorEvents(ctx context.Context) {
-	for {
-		select {
-		case event := <-o.manager.Events():
-			select {
-			case o.inputEvents <- event:
-			case <-ctx.Done():
-				return
-			}
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-// processCorrelatedEvents handles semantically correlated events
-func (o *Orchestrator) processCorrelatedEvents(ctx context.Context) {
+// processEvents handles events from the unified pipeline
+func (o *Orchestrator) processEvents(ctx context.Context) {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case event := <-o.outputEvents:
+		case event := <-o.pipeline.ProcessedEvents():
 			count := atomic.AddInt64(&o.eventCount, 1)
 			if count%1000 == 0 {
 				log.Printf("📊 Processed %d events, latest: %s", count, event.ID)
 			}
 
 		case <-ticker.C:
-			stats := o.manager.Statistics()
-			count := atomic.LoadInt64(&o.eventCount)
-			log.Printf("📈 Status: Events=%d, Active Collectors=%d", count, stats.ActiveCollectors)
+			if o.pipeline != nil {
+				metrics := o.pipeline.GetMetrics()
+				log.Printf("📈 Status: Events=%d, Throughput=%.2f/sec, Dropped=%d",
+					metrics.EventsProcessed,
+					metrics.ThroughputPerSecond,
+					metrics.EventsDropped)
+			}
 
 		case <-ctx.Done():
 			return
 		}
 	}
+}
+
+// bridgeEvents bridges events from CollectorManager (domain.Event) to pipeline (domain.UnifiedEvent)
+func (o *Orchestrator) bridgeEvents(ctx context.Context) {
+	// Create a channel adapter that converts Event to UnifiedEvent
+	adapter := &ManagerAdapter{
+		manager: o.manager,
+		ctx:     ctx,
+	}
+
+	// Add the adapter as a collector to the pipeline
+	if err := o.pipeline.AddCollector("manager-bridge", adapter); err != nil {
+		log.Printf("Failed to add manager bridge: %v", err)
+	}
+}
+
+// ManagerAdapter adapts CollectorManager to the pipeline.Collector interface
+type ManagerAdapter struct {
+	manager   *CollectorManager
+	ctx       context.Context
+	eventChan chan *domain.UnifiedEvent
+}
+
+func (ma *ManagerAdapter) Start(ctx context.Context) error {
+	ma.eventChan = make(chan *domain.UnifiedEvent, 10000)
+
+	// Start conversion goroutine
+	go func() {
+		for {
+			select {
+			case event, ok := <-ma.manager.Events():
+				if !ok {
+					close(ma.eventChan)
+					return
+				}
+
+				// Forward the event (already UnifiedEvent)
+				select {
+				case ma.eventChan <- &event:
+				case <-ctx.Done():
+					return
+				}
+
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return nil
+}
+
+func (ma *ManagerAdapter) Stop() error {
+	// Manager stop is handled by orchestrator
+	return nil
+}
+
+func (ma *ManagerAdapter) Events() <-chan *domain.UnifiedEvent {
+	return ma.eventChan
+}
+
+func (ma *ManagerAdapter) Health() domain.HealthStatus {
+	return ma.manager.Health()
 }
 
 // Statistics returns real-time collector statistics
@@ -294,22 +327,32 @@ func (o *Orchestrator) Statistics() struct {
 	ActiveCollectors  int
 	ProcessedEvents   int64
 	BufferUtilization float64
+	Throughput        float64
 } {
-	managerStats := o.manager.Statistics()
+	var activeCollectors int
+	var throughput float64
+
+	if o.manager != nil {
+		stats := o.manager.Statistics()
+		activeCollectors = stats.ActiveCollectors
+	}
+
 	processedEvents := atomic.LoadInt64(&o.eventCount)
 
-	inputLen := float64(len(o.inputEvents))
-	outputLen := float64(len(o.outputEvents))
-	totalCapacity := float64(cap(o.inputEvents) + cap(o.outputEvents))
-	utilization := (inputLen + outputLen) / totalCapacity * 100
+	if o.pipeline != nil {
+		metrics := o.pipeline.GetMetrics()
+		throughput = metrics.ThroughputPerSecond
+	}
 
 	return struct {
 		ActiveCollectors  int
 		ProcessedEvents   int64
 		BufferUtilization float64
+		Throughput        float64
 	}{
-		ActiveCollectors:  managerStats.ActiveCollectors,
+		ActiveCollectors:  activeCollectors,
 		ProcessedEvents:   processedEvents,
-		BufferUtilization: utilization,
+		BufferUtilization: 0, // No longer relevant with unified pipeline
+		Throughput:        throughput,
 	}
 }
