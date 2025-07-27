@@ -98,7 +98,7 @@ func NewSimpleCorrelationSystem(logger *zap.Logger, config SimpleSystemConfig) *
 
 		// Event channels
 		eventChan:   make(chan *domain.UnifiedEvent, config.EventBufferSize),
-		insightChan: make(chan domain.Insight, 100),
+		insightChan: make(chan domain.Insight, config.EventBufferSize), // Match event buffer size
 
 		config: config,
 		ctx:    ctx,
@@ -142,9 +142,15 @@ func (s *SimpleCorrelationSystem) ProcessEvent(ctx context.Context, event *domai
 		return fmt.Errorf("correlation system not running")
 	}
 
+	// Use a timeout to prevent indefinite blocking
+	timer := time.NewTimer(s.config.ProcessingTimeout)
+	defer timer.Stop()
+
 	select {
 	case s.eventChan <- event:
 		return nil
+	case <-timer.C:
+		return fmt.Errorf("timeout sending event to processing queue")
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-s.ctx.Done():
@@ -326,8 +332,10 @@ func (s *SimpleCorrelationSystem) sendInsight(insight domain.Insight) {
 	case <-s.ctx.Done():
 		return
 	default:
-		// Channel full, drop insight (could also log this)
-		s.logger.Warn("Insight channel full, dropping insight", zap.String("insight_id", insight.ID))
+		// Channel full, log and drop
+		s.logger.Debug("Insight channel full, dropping insight", 
+			zap.String("insight_id", insight.ID),
+			zap.String("insight_type", insight.Type))
 	}
 }
 

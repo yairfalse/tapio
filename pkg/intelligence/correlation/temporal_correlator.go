@@ -168,13 +168,27 @@ func (t *TemporalCorrelator) findCorrelations(event *domain.UnifiedEvent) []Temp
 			continue // Skip self
 		}
 
+		// Skip if events are from different entities (unless it's a cross-entity pattern)
+		if getEntityKey(nearby.Event) != getEntityKey(event) {
+			// Only correlate cross-entity events if they have high confidence already
+			pairKey := EventPairKey{
+				EventA: getEventKey(nearby.Event),
+				EventB: eventKey,
+			}
+			if stats := t.cooccurrence.GetStats(pairKey); stats == nil || stats.Confidence < 0.9 {
+				continue
+			}
+		}
+
 		// Check co-occurrence statistics
 		pairKey := EventPairKey{
 			EventA: getEventKey(nearby.Event),
 			EventB: eventKey,
 		}
 
-		if stats := t.cooccurrence.GetStats(pairKey); stats != nil && stats.Confidence >= t.config.MinConfidence {
+		if stats := t.cooccurrence.GetStats(pairKey); stats != nil && 
+			stats.Confidence >= t.config.MinConfidence && 
+			stats.Count >= t.config.MinOccurrences {
 			correlation := TemporalCorrelation{
 				SourceEvent: EventReference{
 					EventID:   nearby.Event.ID,
