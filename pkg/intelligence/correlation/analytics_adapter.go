@@ -162,20 +162,21 @@ func (a *AnalyticsCorrelationAdapter) convertInsightToFinding(insight domain.Ins
 	relatedEvents := a.getRelatedEventsForInsight(insight)
 
 	// Create or update semantic group based on multi-dimensional context
-	semanticGroup := a.getOrCreateSemanticGroup(insight)
+	semanticGroup := a.getOrCreateSemanticGroupInternal(insight)
 
-	// Enhance finding with multi-dimensional context
-	finding := &interfaces.Finding{
-		ID:            insight.ID,
-		Confidence:    confidence,
-		PatternType:   correlationType,
-		Description:   a.enhanceDescription(insight, relatedEvents),
-		RelatedEvents: a.convertToLegacyEvents(relatedEvents),
-		SemanticGroup: semanticGroup,
+	// Create internal Finding with UnifiedEvents
+	internalFinding := &Finding{
+		ID:                   insight.ID,
+		PatternType:          correlationType,
+		Confidence:           confidence,
+		Description:          a.enhanceDescription(insight, relatedEvents),
+		RelatedUnifiedEvents: relatedEvents,
+		SemanticGroup:        semanticGroup,
+		Timestamp:            time.Now(),
 	}
 
-	// Update latest findings
-	a.latestFindings = finding
+	// Convert to interfaces.Finding for external use
+	a.latestFindings = ConvertToInterfacesFinding(internalFinding)
 
 	a.logger.Debug("Converted insight to finding",
 		zap.String("insight_id", insight.ID),
@@ -260,14 +261,19 @@ func (a *AnalyticsCorrelationAdapter) updateSemanticGroup(event *domain.UnifiedE
 	}
 }
 
-// getOrCreateSemanticGroup gets or creates a semantic group for an insight
-func (a *AnalyticsCorrelationAdapter) getOrCreateSemanticGroup(insight domain.Insight) *interfaces.SemanticGroup {
+// getOrCreateSemanticGroupInternal gets or creates a semantic group summary for an insight
+func (a *AnalyticsCorrelationAdapter) getOrCreateSemanticGroupInternal(insight domain.Insight) *SemanticGroupSummary {
 	// Try to find existing group based on insight metadata
 	groupID := fmt.Sprintf("sg-%s-%d", insight.Type, time.Now().Unix())
 
 	for _, group := range a.semanticGroups {
 		if group.Type == insight.Type {
-			return group
+			// Return as SemanticGroupSummary
+			return &SemanticGroupSummary{
+				ID:     group.ID,
+				Intent: group.Intent,
+				Type:   group.Type,
+			}
 		}
 	}
 
@@ -279,7 +285,13 @@ func (a *AnalyticsCorrelationAdapter) getOrCreateSemanticGroup(insight domain.In
 	}
 
 	a.semanticGroups = append(a.semanticGroups, group)
-	return group
+
+	// Return as SemanticGroupSummary
+	return &SemanticGroupSummary{
+		ID:     group.ID,
+		Intent: group.Intent,
+		Type:   group.Type,
+	}
 }
 
 // updateSpanHierarchy tracks span parent-child relationships
