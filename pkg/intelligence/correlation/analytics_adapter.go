@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/yairfalse/tapio/pkg/domain"
-	"github.com/yairfalse/tapio/pkg/intelligence/interfaces"
 	"go.uber.org/zap"
 )
 
@@ -20,9 +19,9 @@ type AnalyticsCorrelationAdapter struct {
 	logger            *zap.Logger
 
 	// State tracking
-	latestFindings *interfaces.Finding
-	semanticGroups []*interfaces.SemanticGroup
-	groupsByEvent  map[string]*interfaces.SemanticGroup
+	latestFindings *Finding
+	semanticGroups []*SemanticGroup
+	groupsByEvent  map[string]*SemanticGroup
 	mu             sync.RWMutex
 
 	// Event tracking for findings
@@ -46,7 +45,7 @@ func NewAnalyticsCorrelationAdapter(correlationSystem *SimpleCorrelationSystem, 
 	return &AnalyticsCorrelationAdapter{
 		correlationSystem: correlationSystem,
 		logger:            logger,
-		groupsByEvent:     make(map[string]*interfaces.SemanticGroup),
+		groupsByEvent:     make(map[string]*SemanticGroup),
 		eventBuffer:       make([]*domain.UnifiedEvent, 0, 100),
 		eventBufferSize:   100,
 		spanHierarchy:     make(map[string][]string),
@@ -105,19 +104,19 @@ func (a *AnalyticsCorrelationAdapter) ProcessEvent(ctx context.Context, event *d
 }
 
 // GetLatestFindings returns the most recent correlation findings
-func (a *AnalyticsCorrelationAdapter) GetLatestFindings() *interfaces.Finding {
+func (a *AnalyticsCorrelationAdapter) GetLatestFindings() *Finding {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	return a.latestFindings
 }
 
 // GetSemanticGroups returns current semantic groups
-func (a *AnalyticsCorrelationAdapter) GetSemanticGroups() []*interfaces.SemanticGroup {
+func (a *AnalyticsCorrelationAdapter) GetSemanticGroups() []*SemanticGroup {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
 	// Return a copy to avoid race conditions
-	groups := make([]*interfaces.SemanticGroup, len(a.semanticGroups))
+	groups := make([]*SemanticGroup, len(a.semanticGroups))
 	copy(groups, a.semanticGroups)
 	return groups
 }
@@ -165,7 +164,7 @@ func (a *AnalyticsCorrelationAdapter) convertInsightToFinding(insight domain.Ins
 	semanticGroup := a.getOrCreateSemanticGroup(insight)
 
 	// Enhance finding with multi-dimensional context
-	finding := &interfaces.Finding{
+	finding := &Finding{
 		ID:            insight.ID,
 		Confidence:    confidence,
 		PatternType:   correlationType,
@@ -232,7 +231,7 @@ func (a *AnalyticsCorrelationAdapter) updateSemanticGroup(event *domain.UnifiedE
 	traceID := event.TraceContext.TraceID
 
 	// Find or create semantic group for this trace
-	var group *interfaces.SemanticGroup
+	var group *SemanticGroup
 	for _, sg := range a.semanticGroups {
 		if sg.ID == traceID {
 			group = sg
@@ -242,7 +241,7 @@ func (a *AnalyticsCorrelationAdapter) updateSemanticGroup(event *domain.UnifiedE
 
 	if group == nil {
 		// Create new semantic group from trace
-		group = &interfaces.SemanticGroup{
+		group = &SemanticGroup{
 			ID:     traceID,
 			Intent: a.inferSemanticIntent(event),
 			Type:   a.inferSemanticType(event),
@@ -261,7 +260,7 @@ func (a *AnalyticsCorrelationAdapter) updateSemanticGroup(event *domain.UnifiedE
 }
 
 // getOrCreateSemanticGroup gets or creates a semantic group for an insight
-func (a *AnalyticsCorrelationAdapter) getOrCreateSemanticGroup(insight domain.Insight) *interfaces.SemanticGroup {
+func (a *AnalyticsCorrelationAdapter) getOrCreateSemanticGroup(insight domain.Insight) *SemanticGroup {
 	// Try to find existing group based on insight metadata
 	groupID := fmt.Sprintf("sg-%s-%d", insight.Type, time.Now().Unix())
 
@@ -272,7 +271,7 @@ func (a *AnalyticsCorrelationAdapter) getOrCreateSemanticGroup(insight domain.In
 	}
 
 	// Create new group
-	group := &interfaces.SemanticGroup{
+	group := &SemanticGroup{
 		ID:     groupID,
 		Intent: a.inferIntentFromInsight(insight),
 		Type:   insight.Type,
