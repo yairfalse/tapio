@@ -28,21 +28,21 @@ func (a *AnomalyCorrelator) DetectAnomalies(events []*domain.UnifiedEvent) []Ano
 
 // AnomalyResult represents an anomaly detection result
 type AnomalyResult struct {
-	EventID    string
+	EventID      string
 	AnomalyScore float64
-	Description string
+	Description  string
 }
 
 // CorrelationStats tracks statistical data about correlations
 type CorrelationStats struct {
-	TotalObservations int
+	TotalObservations  int
 	CorrectPredictions int
-	FalsePositives    int
-	FalseNegatives    int
-	Accuracy          float64
-	Precision         float64
-	Recall            float64
-	LastUpdated       time.Time
+	FalsePositives     int
+	FalseNegatives     int
+	Accuracy           float64
+	Precision          float64
+	Recall             float64
+	LastUpdated        time.Time
 }
 
 // UpdateStats updates the correlation statistics
@@ -177,7 +177,7 @@ func NewPeriodicPattern(period time.Duration) *PeriodicPattern {
 
 // TimeCorrelationMatrix represents correlations over time
 type TimeCorrelationMatrix struct {
-	matrix    map[string]map[string]float64
+	matrix     map[string]map[string]float64
 	timestamps []time.Time
 	updated    time.Time
 }
@@ -288,12 +288,12 @@ func (gct *GrangerCausalityTest) Test(x, y *TimeSeries) CausalityResult {
 
 // Intervention represents an experimental intervention for causal discovery
 type Intervention struct {
-	ID          string
-	Target      string
-	Type        string
-	Timestamp   time.Time
-	Parameters  map[string]interface{}
-	Results     map[string]float64
+	ID           string
+	Target       string
+	Type         string
+	Timestamp    time.Time
+	Parameters   map[string]interface{}
+	Results      map[string]float64
 	IsSuccessful bool
 }
 
@@ -357,17 +357,17 @@ func NewCorrelationGraph() *CorrelationGraph {
 
 // LearningConfig configures the learning algorithm parameters
 type LearningConfig struct {
-	WindowSize        time.Duration
-	MinSupport        float64
-	MinConfidence     float64
-	MaxPatterns       int
-	LearningRate      float64
-	DecayFactor       float64
-	EnableAdaptive    bool
-	EnableCausality   bool
-	EnableTemporal    bool
-	EnableSpatial     bool
-	UpdateInterval    time.Duration
+	WindowSize      time.Duration
+	MinSupport      float64
+	MinConfidence   float64
+	MaxPatterns     int
+	LearningRate    float64
+	DecayFactor     float64
+	EnableAdaptive  bool
+	EnableCausality bool
+	EnableTemporal  bool
+	EnableSpatial   bool
+	UpdateInterval  time.Duration
 }
 
 // DefaultLearningConfig returns default learning configuration
@@ -489,13 +489,13 @@ type StatisticalTest interface {
 
 // TestResult represents the result of a statistical test
 type TestResult struct {
-	HypothesisID string
-	TestName     string
+	HypothesisID  string
+	TestName      string
 	IsSignificant bool
-	PValue       float64
+	PValue        float64
 	TestStatistic float64
-	Confidence   float64
-	Timestamp    time.Time
+	Confidence    float64
+	Timestamp     time.Time
 }
 
 // NewStatisticalTester creates a new statistical tester
@@ -530,12 +530,12 @@ type RefinementAlgorithm interface {
 
 // RefinedCorrelation represents an improved correlation
 type RefinedCorrelation struct {
-	OriginalID   string
-	NewID        string
-	Improvements []string
+	OriginalID    string
+	NewID         string
+	Improvements  []string
 	OldConfidence float64
 	NewConfidence float64
-	Timestamp    time.Time
+	Timestamp     time.Time
 }
 
 // NewCorrelationRefiner creates a new correlation refiner
@@ -619,14 +619,14 @@ func (pc *PearsonCalculator) Calculate(x, y []float64) float64 {
 // ChiSquareTest performs chi-square statistical tests
 type ChiSquareTest struct {
 	degreesOfFreedom int
-	alpha           float64
+	alpha            float64
 }
 
 // NewChiSquareTest creates a new chi-square test
 func NewChiSquareTest(df int, alpha float64) *ChiSquareTest {
 	return &ChiSquareTest{
 		degreesOfFreedom: df,
-		alpha:           alpha,
+		alpha:            alpha,
 	}
 }
 
@@ -761,11 +761,11 @@ func NewDynamicCorrelationEngine(config LearningConfig) *DynamicCorrelationEngin
 
 // EnvironmentProfile represents the current environment characteristics
 type EnvironmentProfile struct {
-	EventRate       float64
-	ErrorRate       float64
-	Complexity      float64
-	Seasonality     map[string]float64
-	LastUpdated     time.Time
+	EventRate   float64
+	ErrorRate   float64
+	Complexity  float64
+	Seasonality map[string]float64
+	LastUpdated time.Time
 }
 
 // NewEnvironmentProfile creates a new environment profile
@@ -785,18 +785,18 @@ type NormalBehaviorModel struct {
 
 // Pattern represents a behavioral pattern
 type Pattern struct {
-	ID          string
-	Type        string
-	Frequency   float64
-	Confidence  float64
-	LastSeen    time.Time
+	ID         string
+	Type       string
+	Frequency  float64
+	Confidence float64
+	LastSeen   time.Time
 }
 
 // NewNormalBehaviorModel creates a new normal behavior model
 func NewNormalBehaviorModel() *NormalBehaviorModel {
 	return &NormalBehaviorModel{
-		Patterns:   make(map[string]*Pattern),
-		Thresholds: make(map[string]float64),
+		Patterns:    make(map[string]*Pattern),
+		Thresholds:  make(map[string]float64),
 		LastTrained: time.Now(),
 	}
 }
@@ -832,12 +832,12 @@ type WorkloadAnalyzer struct {
 
 // WorkloadPattern represents a workload pattern
 type WorkloadPattern struct {
-	Name        string
-	Type        string
-	Frequency   float64
-	Intensity   float64
-	Duration    time.Duration
-	LastSeen    time.Time
+	Name      string
+	Type      string
+	Frequency float64
+	Intensity float64
+	Duration  time.Duration
+	LastSeen  time.Time
 }
 
 // NewWorkloadAnalyzer creates a new workload analyzer
@@ -850,15 +850,15 @@ func NewWorkloadAnalyzer() *WorkloadAnalyzer {
 
 // CorrelationResult represents the result of correlation analysis
 type CorrelationResult struct {
-	ID          string
-	Type        string
-	Source      *domain.UnifiedEvent
-	Target      *domain.UnifiedEvent
-	Strength    float64
-	Confidence  float64
-	Latency     time.Duration
-	Evidence    []string
-	Timestamp   time.Time
+	ID         string
+	Type       string
+	Source     *domain.UnifiedEvent
+	Target     *domain.UnifiedEvent
+	Strength   float64
+	Confidence float64
+	Latency    time.Duration
+	Evidence   []string
+	Timestamp  time.Time
 }
 
 // NewCorrelationResult creates a new correlation result
@@ -882,12 +882,12 @@ type LearnedIntelligence struct {
 
 // IntelligenceRule represents a learned rule
 type IntelligenceRule struct {
-	ID          string
-	Condition   string
-	Action      string
-	Confidence  float64
+	ID           string
+	Condition    string
+	Action       string
+	Confidence   float64
 	Applications int
-	CreatedAt   time.Time
+	CreatedAt    time.Time
 }
 
 // Prediction represents a prediction about future events
@@ -913,18 +913,18 @@ func NewLearnedIntelligence() *LearnedIntelligence {
 
 // LearnedCorrelation represents a learned correlation pattern
 type LearnedCorrelation struct {
-	ID            string
-	Pattern       string
-	Type          string
-	EventTypeA    string
-	EventTypeB    string
-	Strength      float64
-	Confidence    float64
-	Observations  int
-	TimeDelta     time.Duration
-	Conditions    map[string]interface{}
-	LastSeen      time.Time
-	CreatedAt     time.Time
+	ID           string
+	Pattern      string
+	Type         string
+	EventTypeA   string
+	EventTypeB   string
+	Strength     float64
+	Confidence   float64
+	Observations int
+	TimeDelta    time.Duration
+	Conditions   map[string]interface{}
+	LastSeen     time.Time
+	CreatedAt    time.Time
 }
 
 // NewLearnedCorrelation creates a new learned correlation

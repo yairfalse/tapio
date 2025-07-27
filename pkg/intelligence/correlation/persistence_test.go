@@ -79,7 +79,7 @@ func TestInMemoryCorrelationStore_GetCorrelationsByTimeRange(t *testing.T) {
 	ctx := context.Background()
 
 	now := time.Now()
-	
+
 	// Store correlations with different timestamps
 	correlations := []*StoredCorrelation{
 		{Type: "test1", Timestamp: now.Add(-2 * time.Hour)},
@@ -145,12 +145,12 @@ func TestInMemoryCorrelationStore_UpdateCorrelationFeedback(t *testing.T) {
 
 	// Add positive feedback
 	positiveFeedback := CorrelationFeedback{
-		UserID:    "user1",
-		Timestamp: time.Now(),
-		IsCorrect: true,
+		UserID:     "user1",
+		Timestamp:  time.Now(),
+		IsCorrect:  true,
 		Confidence: 0.9,
-		Comments:  "This correlation is accurate",
-		Source:    "explicit",
+		Comments:   "This correlation is accurate",
+		Source:     "explicit",
 	}
 
 	err = store.UpdateCorrelationFeedback(ctx, correlation.ID, positiveFeedback)
@@ -158,12 +158,12 @@ func TestInMemoryCorrelationStore_UpdateCorrelationFeedback(t *testing.T) {
 
 	// Add negative feedback
 	negativeFeedback := CorrelationFeedback{
-		UserID:    "user2",
-		Timestamp: time.Now(),
-		IsCorrect: false,
+		UserID:     "user2",
+		Timestamp:  time.Now(),
+		IsCorrect:  false,
 		Confidence: 0.3,
-		Comments:  "This seems incorrect",
-		Source:    "explicit",
+		Comments:   "This seems incorrect",
+		Source:     "explicit",
 	}
 
 	err = store.UpdateCorrelationFeedback(ctx, correlation.ID, negativeFeedback)
@@ -289,7 +289,7 @@ func TestInMemoryCorrelationStore_CleanupOldCorrelations(t *testing.T) {
 	ctx := context.Background()
 
 	now := time.Now()
-	
+
 	// Store correlations with different ages
 	correlations := []*StoredCorrelation{
 		{Type: "old1", Timestamp: now.Add(-25 * time.Hour)},
@@ -352,12 +352,12 @@ func TestCorrelationPersistenceService_PersistCorrelation(t *testing.T) {
 	ctx := context.Background()
 
 	sourceEvent := createPersistenceTestUnifiedEvent("source-1")
-	
+
 	// Test K8s correlation persistence
 	k8sCorr := K8sCorrelation{
-		Type:   "ownership",
-		Source: ResourceRef{Name: "pod-1", Kind: "Pod"},
-		Target: ResourceRef{Name: "rs-1", Kind: "ReplicaSet"},
+		Type:       "ownership",
+		Source:     ResourceRef{Name: "pod-1", Kind: "Pod"},
+		Target:     ResourceRef{Name: "rs-1", Kind: "ReplicaSet"},
 		Confidence: 0.95,
 	}
 
@@ -387,7 +387,7 @@ func TestCorrelationPersistenceService_GetHistoricalCorrelations(t *testing.T) {
 	ctx := context.Background()
 
 	now := time.Now()
-	
+
 	// Store historical correlations
 	correlations := []*StoredCorrelation{
 		{Type: "k8s_correlation", Timestamp: now.Add(-30 * time.Minute)},
