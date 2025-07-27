@@ -9,10 +9,12 @@ import (
 	"time"
 
 	"github.com/yairfalse/tapio/pkg/domain"
+	"github.com/yairfalse/tapio/pkg/intelligence/analytics/engine"
+	"github.com/yairfalse/tapio/pkg/intelligence/interfaces"
 	"go.uber.org/zap"
 )
 
-// Example shows how to use the correlation system
+// Example shows how to integrate the correlation system with analytics engine
 func ExampleIntegration() {
 	// Create logger
 	logger, _ := zap.NewProduction()
@@ -29,12 +31,29 @@ func ExampleIntegration() {
 	// 2. Create the analytics adapter
 	adapter := NewAnalyticsCorrelationAdapter(correlationSystem, logger)
 
-	// 3. Start the system
-	if err := adapter.Start(); err != nil {
+	// 3. Create mock pipeline and tracer for example
+	mockPipeline := &mockEventPipeline{}
+	mockTracer := &mockSemanticTracer{}
+
+	// 4. Create analytics engine with our correlation adapter
+	analyticsConfig := engine.DefaultConfig()
+	analyticsEngine, err := engine.NewAnalyticsEngine(
+		analyticsConfig,
+		logger,
+		mockPipeline,
+		adapter, // Our correlation adapter implements CorrelationEngine
+		mockTracer,
+	)
+	if err != nil {
 		panic(err)
 	}
 
-	// 4. Process events with OTEL context
+	// 5. Start the system
+	if err := analyticsEngine.Start(); err != nil {
+		panic(err)
+	}
+
+	// 6. Process events with OTEL context
 	ctx := context.Background()
 
 	// Example: OOM Kill event with enhanced OTEL trace context
@@ -83,12 +102,14 @@ func ExampleIntegration() {
 	}
 
 	// Process the event
-	err := adapter.ProcessEvent(ctx, event1)
+	result, err := analyticsEngine.ProcessEvent(ctx, event1)
 	if err != nil {
 		logger.Error("Failed to process event", zap.Error(err))
 	} else {
 		logger.Info("Event processed",
-			zap.String("event_id", event1.ID),
+			zap.String("event_id", result.EventID),
+			zap.Float64("confidence", result.ConfidenceScore),
+			zap.String("correlation_id", result.CorrelationID),
 		)
 	}
 
@@ -129,9 +150,9 @@ func ExampleIntegration() {
 		},
 	}
 
-	_ = adapter.ProcessEvent(ctx, event2)
+	_, _ = analyticsEngine.ProcessEvent(ctx, event2)
 
-	// 5. Check correlation findings
+	// 7. Check correlation findings
 	time.Sleep(100 * time.Millisecond) // Allow async processing
 
 	if findings := adapter.GetLatestFindings(); findings != nil {
@@ -142,7 +163,7 @@ func ExampleIntegration() {
 		fmt.Printf("  Semantic Group: %+v\n", findings.SemanticGroup)
 	}
 
-	// 6. Check semantic groups (OTEL trace grouping)
+	// 8. Check semantic groups (OTEL trace grouping)
 	groups := adapter.GetSemanticGroups()
 	fmt.Printf("\nSemantic Groups: %d\n", len(groups))
 	for _, group := range groups {
@@ -150,15 +171,47 @@ func ExampleIntegration() {
 			group.ID, group.Intent, group.Type)
 	}
 
-	// 7. Get correlation statistics
+	// 9. Get correlation statistics
 	stats := adapter.GetStats()
 	fmt.Printf("\nCorrelation Statistics:\n")
 	for key, value := range stats {
 		fmt.Printf("  %s: %v\n", key, value)
 	}
 
-	// 8. Stop the system
-	_ = adapter.Stop()
+	// 10. Stop the system
+	_ = analyticsEngine.Stop()
+}
+
+// Mock implementations for the example
+
+type mockEventPipeline struct{}
+
+func (m *mockEventPipeline) Start() error                                 { return nil }
+func (m *mockEventPipeline) Stop() error                                  { return nil }
+func (m *mockEventPipeline) Submit(event *interfaces.PipelineEvent) error { return nil }
+func (m *mockEventPipeline) GetEvent() *interfaces.PipelineEvent {
+	return &interfaces.PipelineEvent{}
+}
+func (m *mockEventPipeline) PutEvent(event *interfaces.PipelineEvent) {}
+func (m *mockEventPipeline) GetOutput() (*interfaces.PipelineEvent, error) {
+	return nil, fmt.Errorf("no events")
+}
+func (m *mockEventPipeline) GetMetrics() *interfaces.PipelineMetrics {
+	return &interfaces.PipelineMetrics{}
+}
+
+type mockSemanticTracer struct {
+	groups []*interfaces.SemanticGroup
+}
+
+func (m *mockSemanticTracer) TraceEvent(ctx context.Context, event *domain.UnifiedEvent) error {
+	return nil
+}
+func (m *mockSemanticTracer) GetSemanticGroups() []*interfaces.SemanticGroup {
+	return m.groups
+}
+func (m *mockSemanticTracer) GetTraceContext(eventID string) *interfaces.TraceContext {
+	return nil
 }
 
 // Example output:
