@@ -50,9 +50,9 @@ type EventWindow struct {
 	mu        sync.RWMutex
 
 	// Indexes for fast lookup
-	byType   map[string][]int // event type -> indexes
-	byEntity map[string][]int // entity -> indexes
-	byTime   *TemporalTimeIndex       // time-based index
+	byType   map[string][]int   // event type -> indexes
+	byEntity map[string][]int   // entity -> indexes
+	byTime   *TemporalTimeIndex // time-based index
 }
 
 // WindowEvent is an event in the window
