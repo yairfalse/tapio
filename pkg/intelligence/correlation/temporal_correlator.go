@@ -186,8 +186,8 @@ func (t *TemporalCorrelator) findCorrelations(event *domain.UnifiedEvent) []Temp
 			EventB: eventKey,
 		}
 
-		if stats := t.cooccurrence.GetStats(pairKey); stats != nil && 
-			stats.Confidence >= t.config.MinConfidence && 
+		if stats := t.cooccurrence.GetStats(pairKey); stats != nil &&
+			stats.Confidence >= t.config.MinConfidence &&
 			stats.Count >= t.config.MinOccurrences {
 			correlation := TemporalCorrelation{
 				SourceEvent: EventReference{

@@ -244,7 +244,7 @@ func (suite *IntegrationTestSuite) TestConcurrentProcessingIntegration(t *testin
 	timeout := time.After(10 * time.Second)
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
-	
+
 	var processedCount int64
 	for {
 		select {
@@ -259,7 +259,7 @@ func (suite *IntegrationTestSuite) TestConcurrentProcessingIntegration(t *testin
 		}
 	}
 done:
-	
+
 	t.Logf("Concurrent test: processed %d events out of %d sent", processedCount, expectedCount)
 	assert.Equal(t, processedCount, expectedCount,
 		"Should have processed all concurrent events")
@@ -500,7 +500,7 @@ func createStreamingTestEvents() []*domain.UnifiedEvent {
 	// We need repeated patterns to reach MinOccurrences: 3
 	events := make([]*domain.UnifiedEvent, 0)
 	baseTime := time.Now()
-	
+
 	// Create 3 deployment sequences to trigger temporal correlation
 	for seq := 0; seq < 3; seq++ {
 		// Each sequence: Deployment -> ReplicaSet -> Pod creation
@@ -522,7 +522,7 @@ func createStreamingTestEvents() []*domain.UnifiedEvent {
 				APIVersion: "apps/v1",
 			},
 		})
-		
+
 		// ReplicaSet follows Deployment by ~1 second
 		events = append(events, &domain.UnifiedEvent{
 			ID:        fmt.Sprintf("rs-%d", seq),
@@ -542,7 +542,7 @@ func createStreamingTestEvents() []*domain.UnifiedEvent {
 				APIVersion: "apps/v1",
 			},
 		})
-		
+
 		// Pod follows ReplicaSet by ~2 seconds
 		events = append(events, &domain.UnifiedEvent{
 			ID:        fmt.Sprintf("pod-%d", seq),

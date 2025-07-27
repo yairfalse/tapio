@@ -333,7 +333,7 @@ func (s *SimpleCorrelationSystem) sendInsight(insight domain.Insight) {
 		return
 	default:
 		// Channel full, log and drop
-		s.logger.Debug("Insight channel full, dropping insight", 
+		s.logger.Debug("Insight channel full, dropping insight",
 			zap.String("insight_id", insight.ID),
 			zap.String("insight_type", insight.Type))
 	}
