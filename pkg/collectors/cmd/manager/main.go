@@ -91,19 +91,20 @@ func registerCollectors(manager *collectors.Manager) error {
 			Name:            "ebpf-main",
 			Enabled:         true,
 			EventBufferSize: 10000,
-			Programs: map[string]bool{
-				"network": true,
-				"memory":  true,
+			Programs: []ebpfcore.ProgramSpec{
+				{
+					Name:       "network_monitor",
+					Type:       ebpfcore.ProgramTypeKprobe,
+					AttachType: ebpfcore.AttachTypeEntry,
+				},
+				{
+					Name:       "memory_tracker",
+					Type:       ebpfcore.ProgramTypeKprobe,
+					AttachType: ebpfcore.AttachTypeEntry,
+				},
 			},
-			NetworkConfig: ebpfcore.NetworkConfig{
-				CaptureIncoming: true,
-				CaptureOutgoing: true,
-				ProtocolFilter:  []string{"tcp", "udp"},
-			},
-			MemoryConfig: ebpfcore.MemoryConfig{
-				TrackAllocations: true,
-				TrackOOM:         true,
-			},
+			EnableNetwork: true,
+			EnableMemory:  true,
 		}
 
 		ebpfCollector, err := collectors.CreateEBPFCollector("ebpf", ebpfConfig)
