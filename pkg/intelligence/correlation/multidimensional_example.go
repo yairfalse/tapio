@@ -44,7 +44,7 @@ func MultiDimensionalCorrelationDemo() {
 	dbHighLoad := &domain.UnifiedEvent{
 		ID:        "db-high-load",
 		Timestamp: baseTime,
-		Type:      domain.EventTypeMetrics,
+		Type:      domain.EventTypeMetric,
 		Source:    "prometheus",
 		Message:   "MySQL CPU usage at 95%",
 		Severity:  domain.EventSeverityWarning,
@@ -80,7 +80,7 @@ func MultiDimensionalCorrelationDemo() {
 	dbConnExhausted := &domain.UnifiedEvent{
 		ID:        "db-conn-exhausted",
 		Timestamp: baseTime.Add(30 * time.Second),
-		Type:      domain.EventTypeApplication,
+		Type:      domain.EventTypeLog,
 		Source:    "mysql",
 		Message:   "Too many connections",
 		Severity:  domain.EventSeverityError,
@@ -116,7 +116,7 @@ func MultiDimensionalCorrelationDemo() {
 		orderFailure := &domain.UnifiedEvent{
 			ID:        fmt.Sprintf("order-failure-%d", i),
 			Timestamp: baseTime.Add(35*time.Second + time.Duration(i)*time.Second),
-			Type:      domain.EventTypeApplication,
+			Type:      domain.EventTypeLog,
 			Source:    "order-service",
 			Message:   "Database connection timeout",
 			Severity:  domain.EventSeverityError,
