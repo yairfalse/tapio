@@ -367,15 +367,15 @@ func (m *K8sInformerMonitor) handlePodAdd(pod *v1.Pod) {
 	}
 
 	event := &core.CNIRawEvent{
-		ID:         eventID,
-		Timestamp:  time.Now(),
-		Source:     "k8s-informer",
-		Operation:  core.CNIOperationAdd,
-		Success:    pod.Status.Phase != v1.PodFailed,
-		PodName:    pod.Name,
+		ID:           eventID,
+		Timestamp:    time.Now(),
+		Source:       "k8s-informer",
+		Operation:    core.CNIOperationAdd,
+		Success:      pod.Status.Phase != v1.PodFailed,
+		PodName:      pod.Name,
 		PodNamespace: pod.Namespace,
-		AssignedIP: pod.Status.PodIP,
-		PluginName: m.detectCNIPlugin(pod),
+		AssignedIP:   pod.Status.PodIP,
+		PluginName:   m.detectCNIPlugin(pod),
 		Annotations: map[string]string{
 			"event_type": "pod_ip_allocated",
 			"pod_uid":    string(pod.UID),
@@ -408,15 +408,15 @@ func (m *K8sInformerMonitor) handlePodUpdate(oldPod, newPod *v1.Pod) {
 	if oldPod.Status.PodIP != newPod.Status.PodIP {
 		eventID := fmt.Sprintf("pod_ip_change_%s_%s_%d", newPod.Namespace, newPod.Name, time.Now().UnixNano())
 		event := &core.CNIRawEvent{
-			ID:         eventID,
-			Timestamp:  time.Now(),
-			Source:     "k8s-informer",
-			Operation:  core.CNIOperationOther,
-			Success:    true,
-			PodName:    newPod.Name,
+			ID:           eventID,
+			Timestamp:    time.Now(),
+			Source:       "k8s-informer",
+			Operation:    core.CNIOperationOther,
+			Success:      true,
+			PodName:      newPod.Name,
 			PodNamespace: newPod.Namespace,
-			AssignedIP: newPod.Status.PodIP,
-			PluginName: m.detectCNIPlugin(newPod),
+			AssignedIP:   newPod.Status.PodIP,
+			PluginName:   m.detectCNIPlugin(newPod),
 			Annotations: map[string]string{
 				"event_type": "pod_ip_changed",
 				"old_ip":     oldPod.Status.PodIP,
@@ -439,15 +439,15 @@ func (m *K8sInformerMonitor) handlePodDelete(pod *v1.Pod) {
 	}
 
 	event := &core.CNIRawEvent{
-		ID:         eventID,
-		Timestamp:  time.Now(),
-		Source:     "k8s-informer",
-		Operation:  core.CNIOperationDel,
-		Success:    true,
-		PodName:    pod.Name,
+		ID:           eventID,
+		Timestamp:    time.Now(),
+		Source:       "k8s-informer",
+		Operation:    core.CNIOperationDel,
+		Success:      true,
+		PodName:      pod.Name,
 		PodNamespace: pod.Namespace,
-		AssignedIP: pod.Status.PodIP,
-		PluginName: m.detectCNIPlugin(pod),
+		AssignedIP:   pod.Status.PodIP,
+		PluginName:   m.detectCNIPlugin(pod),
 		Annotations: map[string]string{
 			"event_type": "pod_ip_deallocated",
 			"pod_uid":    string(pod.UID),
@@ -465,11 +465,11 @@ func (m *K8sInformerMonitor) handleServiceChange(svc *v1.Service, changeType str
 	}
 
 	event := &core.CNIRawEvent{
-		ID:        eventID,
-		Timestamp: time.Now(),
-		Source:    "k8s-informer",
-		Operation: core.CNIOperationOther,
-		Success:   true,
+		ID:           eventID,
+		Timestamp:    time.Now(),
+		Source:       "k8s-informer",
+		Operation:    core.CNIOperationOther,
+		Success:      true,
 		PodNamespace: svc.Namespace,
 		Annotations: map[string]string{
 			"event_type":    "service_" + changeType,
@@ -506,11 +506,11 @@ func (m *K8sInformerMonitor) handleEndpointsChange(ep *v1.Endpoints, changeType 
 	}
 
 	event := &core.CNIRawEvent{
-		ID:        eventID,
-		Timestamp: time.Now(),
-		Source:    "k8s-informer",
-		Operation: core.CNIOperationOther,
-		Success:   true,
+		ID:           eventID,
+		Timestamp:    time.Now(),
+		Source:       "k8s-informer",
+		Operation:    core.CNIOperationOther,
+		Success:      true,
 		PodNamespace: ep.Namespace,
 		Annotations: map[string]string{
 			"event_type":     "endpoints_" + changeType,
@@ -529,11 +529,11 @@ func (m *K8sInformerMonitor) handleNetworkPolicyChange(np *networkingv1.NetworkP
 	}
 
 	event := &core.CNIRawEvent{
-		ID:        eventID,
-		Timestamp: time.Now(),
-		Source:    "k8s-informer",
-		Operation: core.CNIOperationOther,
-		Success:   true,
+		ID:           eventID,
+		Timestamp:    time.Now(),
+		Source:       "k8s-informer",
+		Operation:    core.CNIOperationOther,
+		Success:      true,
 		PodNamespace: np.Namespace,
 		Annotations: map[string]string{
 			"event_type":          "network_policy_" + changeType,

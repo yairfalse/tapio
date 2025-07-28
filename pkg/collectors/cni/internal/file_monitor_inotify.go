@@ -284,11 +284,11 @@ func (m *InotifyFileMonitor) handleFileWrite(path string) *core.CNIRawEvent {
 	}
 
 	return &core.CNIRawEvent{
-		ID:         fmt.Sprintf("inotify_write_%s_%d", filepath.Base(path), time.Now().UnixNano()),
-		Timestamp:  time.Now(),
-		Source:     "inotify-file",
-		Operation:  core.CNIOperationOther,
-		Success:    true,
+		ID:          fmt.Sprintf("inotify_write_%s_%d", filepath.Base(path), time.Now().UnixNano()),
+		Timestamp:   time.Now(),
+		Source:      "inotify-file",
+		Operation:   core.CNIOperationOther,
+		Success:     true,
 		PluginName:  pluginName,
 		RawConfig:   string(content),
 		Annotations: annotations,
@@ -453,9 +453,9 @@ func (m *InotifyFileMonitor) calculateChecksum(content []byte) string {
 
 func (m *InotifyFileMonitor) sendErrorEvent(err error) {
 	event := &core.CNIRawEvent{
-		ID:        fmt.Sprintf("inotify_error_%d", time.Now().UnixNano()),
-		Timestamp: time.Now(),
-		Source:    "inotify-file",
+		ID:           fmt.Sprintf("inotify_error_%d", time.Now().UnixNano()),
+		Timestamp:    time.Now(),
+		Source:       "inotify-file",
 		Operation:    core.CNIOperationOther,
 		Success:      false,
 		ErrorMessage: err.Error(),

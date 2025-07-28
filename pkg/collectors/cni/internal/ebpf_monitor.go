@@ -344,11 +344,11 @@ func (m *EBPFMonitor) convertToCNIEvent(event *CNIEvent) *core.CNIRawEvent {
 	}
 
 	return &core.CNIRawEvent{
-		ID:         fmt.Sprintf("ebpf_%d_%d", event.PID, event.Timestamp),
-		Timestamp:  time.Unix(0, int64(event.Timestamp)),
-		Source:     "ebpf",
-		Operation:  operation,
-		Success:    true, // Kernel operations are assumed successful if they're traced
+		ID:          fmt.Sprintf("ebpf_%d_%d", event.PID, event.Timestamp),
+		Timestamp:   time.Unix(0, int64(event.Timestamp)),
+		Source:      "ebpf",
+		Operation:   operation,
+		Success:     true, // Kernel operations are assumed successful if they're traced
 		PluginName:  m.detectPlugin(comm, ifname),
 		Command:     comm,
 		Annotations: annotations,
