@@ -124,16 +124,14 @@ func registerCollectors(manager *collectors.Manager) error {
 			Name:            "systemd-main",
 			Enabled:         true,
 			EventBufferSize: 5000,
-			Units: []string{
+			ServiceFilter: []string{
 				"docker.service",
 				"kubelet.service",
 				"containerd.service",
 			},
-			JournalConfig: systemdcore.JournalConfig{
-				Since:   "1h",
-				Follow:  true,
-				Matches: []string{"PRIORITY=0..4"}, // Errors and warnings
-			},
+			WatchServiceStates:   true,
+			WatchServiceFailures: true,
+			UnitTypes:            []string{"service"},
 		}
 
 		systemdCollector, err := collectors.CreateSystemdCollector("systemd", systemdConfig)
