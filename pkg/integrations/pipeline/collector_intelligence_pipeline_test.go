@@ -1,6 +1,3 @@
-//go:build experimental
-// +build experimental
-
 package pipeline
 
 import (
@@ -11,9 +8,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest"
+
 	"github.com/yairfalse/tapio/pkg/collectors"
 	"github.com/yairfalse/tapio/pkg/domain"
-	"go.uber.org/zap/zaptest"
 )
 
 // mockCollector implements collectors.CollectorInterface for testing

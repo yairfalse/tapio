@@ -1,6 +1,3 @@
-//go:build experimental
-// +build experimental
-
 package pipeline
 
 import (
@@ -9,11 +6,12 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/yairfalse/tapio/pkg/collectors"
 	"github.com/yairfalse/tapio/pkg/domain"
 	"github.com/yairfalse/tapio/pkg/integrations/analytics"
 	"github.com/yairfalse/tapio/pkg/intelligence/correlation"
-	"go.uber.org/zap"
 )
 
 // CollectorIntelligencePipeline connects collectors to the intelligence pipeline

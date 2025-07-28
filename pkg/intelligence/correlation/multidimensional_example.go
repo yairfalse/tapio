@@ -1,6 +1,3 @@
-//go:build experimental
-// +build experimental
-
 package correlation
 
 import (
@@ -8,8 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/yairfalse/tapio/pkg/domain"
 	"go.uber.org/zap"
+
+	"github.com/yairfalse/tapio/pkg/domain"
 )
 
 // MultiDimensionalCorrelationDemo demonstrates the correlation engine in action
