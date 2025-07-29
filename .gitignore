@@ -78,6 +78,11 @@ proto/gen/
 *-tests
 *-tests-linux
 ebpf-tests*
+cni-test
+cni-test-*
+test-simple-*
+test-monitors
+cni-collector
 
 # Build artifacts
 /bin/
