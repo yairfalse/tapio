@@ -5,6 +5,7 @@ go 1.24.3
 require (
 	github.com/cilium/ebpf v0.12.3
 	github.com/coreos/go-systemd/v22 v22.5.0
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/golang-jwt/jwt/v5 v5.2.3
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0
