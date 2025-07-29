@@ -354,6 +354,36 @@ func (c *CNICollector) initializeMonitors() error {
 		}
 	}
 
+	// Initialize IPAM monitor for pool utilization tracking
+	if c.config.EnableIPAMMonitoring {
+		monitor, err := NewIPAMMonitor(c.config)
+		if err != nil {
+			c.recordError(fmt.Errorf("failed to create IPAM monitor: %w", err))
+		} else {
+			c.monitors = append(c.monitors, monitor)
+		}
+	}
+
+	// Initialize network policy monitor for enforcement tracking
+	if c.config.EnableNetPolMonitoring {
+		monitor, err := NewNetworkPolicyMonitor(c.config)
+		if err != nil {
+			c.recordError(fmt.Errorf("failed to create network policy monitor: %w", err))
+		} else {
+			c.monitors = append(c.monitors, monitor)
+		}
+	}
+
+	// Initialize CNI chain monitor for plugin chaining
+	if c.config.EnableChainMonitoring {
+		monitor, err := NewCNIChainMonitor(c.config)
+		if err != nil {
+			c.recordError(fmt.Errorf("failed to create CNI chain monitor: %w", err))
+		} else {
+			c.monitors = append(c.monitors, monitor)
+		}
+	}
+
 	if len(c.monitors) == 0 {
 		return fmt.Errorf("no monitors could be initialized")
 	}
@@ -384,6 +414,9 @@ func (c *CNICollector) processRawEvents() {
 
 			// Update statistics
 			c.updateStatistics(rawEvent, unifiedEvent)
+
+			// Forward to specialized monitors for analytics
+			c.forwardToAnalytics(rawEvent)
 
 			// Submit to performance adapter for high-throughput processing
 			if err := c.perfAdapter.Submit(unifiedEvent); err != nil {
@@ -552,4 +585,19 @@ func getNodeHostname() string {
 		return hostname
 	}
 	return "unknown-node"
+}
+
+// forwardToAnalytics forwards events to specialized analytics monitors
+func (c *CNICollector) forwardToAnalytics(event core.CNIRawEvent) {
+	// Forward to IPAM monitor for IP allocation analytics
+	if event.AssignedIP != "" || event.Operation == core.CNIOperationDel {
+		for _, monitor := range c.monitors {
+			if ipamMonitor, ok := monitor.(*IPAMMonitor); ok {
+				ipamMonitor.ProcessCNIEvent(event)
+			}
+		}
+	}
+
+	// Forward to network policy correlator if applicable
+	// This would be done at the intelligence layer, not in the collector
 }

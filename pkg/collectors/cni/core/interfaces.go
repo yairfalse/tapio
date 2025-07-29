@@ -52,6 +52,11 @@ type Config struct {
 	UseInotify     bool `json:"use_inotify"`      // Use inotify for file monitoring
 	UseK8sInformer bool `json:"use_k8s_informer"` // Use K8s informers instead of kubectl
 
+	// Advanced monitoring features
+	EnableIPAMMonitoring   bool `json:"enable_ipam_monitoring"`   // Monitor IPAM pool utilization
+	EnableNetPolMonitoring bool `json:"enable_netpol_monitoring"` // Monitor network policy enforcement
+	EnableChainMonitoring  bool `json:"enable_chain_monitoring"`  // Monitor CNI plugin chaining
+
 	// Plugin-specific configurations
 	CiliumConfig  *CiliumConfig  `json:"cilium_config,omitempty"`
 	CalicoConfig  *CalicoConfig  `json:"calico_config,omitempty"`

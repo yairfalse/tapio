@@ -1,0 +1,14 @@
+--- pkg/collectors/ebpf/bpf/common.h
++++ pkg/collectors/ebpf/bpf/common.h
+@@ -1,6 +1,11 @@
+ #ifndef __COMMON_H
+ #define __COMMON_H
+ 
++// Fix for ARM64 PT_REGS
++#if defined(__aarch64__)
++#include <linux/ptrace.h>
++#endif
++
+ #include <linux/types.h>
+ 
+ // Event types
