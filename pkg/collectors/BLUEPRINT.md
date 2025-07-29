@@ -227,6 +227,45 @@ data, _ := json.Marshal(obj.Object)
 - namespace: Object namespace
 - name: Object name
 
+### 4. etcd Collector
+
+**Purpose**: Watch etcd for K8s state changes at the storage layer
+
+**What to collect**:
+- Key changes under /registry/
+- Lease events
+- Compaction events
+- Watch events
+
+**Implementation approach**:
+```go
+// Use etcd client v3
+import "go.etcd.io/etcd/client/v3"
+
+// Watch K8s registry prefix
+watchChan := client.Watch(ctx, "/registry/", clientv3.WithPrefix())
+
+// Emit raw etcd events
+data, _ := json.Marshal(map[string]interface{}{
+    "type": watchResp.Events[0].Type.String(),
+    "key": string(watchResp.Events[0].Kv.Key),
+    "value": string(watchResp.Events[0].Kv.Value),
+    "version": watchResp.Events[0].Kv.Version,
+})
+```
+
+**Metadata**:
+- operation: PUT/DELETE
+- key: Full key path
+- resource_type: Extracted from key (e.g., /registry/pods/...)
+- revision: etcd revision number
+
+**Why etcd?**:
+- See K8s changes before they hit API
+- Detect split-brain scenarios
+- Track actual storage-level changes
+- Debug K8s control plane issues
+
 ## Testing Template
 
 ```go
@@ -264,6 +303,7 @@ registry.Register("ebpf", ebpf.NewUnifiedCollector(config))
 registry.Register("k8s", k8s.NewCollector(config))
 registry.Register("systemd", systemd.NewCollector(config))
 registry.Register("cni", cni.NewCollector(config))
+registry.Register("etcd", etcd.NewCollector(config))
 
 // Start all
 registry.Start(ctx)
