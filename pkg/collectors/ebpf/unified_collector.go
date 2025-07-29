@@ -28,17 +28,17 @@ const (
 
 // UnifiedCollector uses a single CO-RE eBPF program for all collection
 type UnifiedCollector struct {
-	config    collectors.CollectorConfig
-	events    chan collectors.RawEvent
-	objs      unifiedObjects
-	links     []link.Link
-	reader    *ringbuf.Reader
-	ctx       context.Context
-	cancel    context.CancelFunc
-	wg        sync.WaitGroup
-	healthy   bool
-	mu        sync.RWMutex
-	metrics   CollectorMetrics
+	config  collectors.CollectorConfig
+	events  chan collectors.RawEvent
+	objs    unifiedObjects
+	links   []link.Link
+	reader  *ringbuf.Reader
+	ctx     context.Context
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
+	healthy bool
+	mu      sync.RWMutex
+	metrics CollectorMetrics
 }
 
 // CollectorMetrics tracks performance
@@ -284,7 +284,7 @@ func parseUnifiedEvent(data []byte) *unifiedEvent {
 // createMetadata creates metadata for the event
 func (c *UnifiedCollector) createMetadata(event *unifiedEvent) map[string]string {
 	metadata := make(map[string]string)
-	
+
 	metadata["cpu"] = fmt.Sprintf("%d", event.Cpu)
 	metadata["pid"] = fmt.Sprintf("%d", event.Pid)
 	metadata["tid"] = fmt.Sprintf("%d", event.Tid)
@@ -319,7 +319,7 @@ func (c *UnifiedCollector) createMetadata(event *unifiedEvent) map[string]string
 func (c *UnifiedCollector) updateMetrics(bytes uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.metrics.EventsReceived++
 	c.metrics.BytesProcessed += bytes
 }
@@ -338,14 +338,14 @@ func (c *UnifiedCollector) healthMonitor() {
 		case <-ticker.C:
 			c.mu.Lock()
 			currentEvents := c.metrics.EventsReceived
-			
+
 			// Check if we're receiving events
 			if currentEvents == lastEvents {
 				c.healthy = false
 			} else {
 				c.healthy = true
 			}
-			
+
 			lastEvents = currentEvents
 			c.mu.Unlock()
 

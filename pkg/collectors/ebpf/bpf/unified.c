@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Unified eBPF program for Tapio collector with CO-RE support
 
-#include "vmlinux.h"
+#include "headers/vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
@@ -39,14 +39,6 @@ struct {
     __uint(max_entries, 8 * 1024 * 1024); // 8MB
 } events SEC(".maps");
 
-// Per-CPU scratch buffer for building events
-struct {
-    __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
-    __type(key, __u32);
-    __type(value, struct event);
-    __uint(max_entries, 1);
-} scratch_map SEC(".maps");
-
 // Helper to check if process is in container
 static __always_inline bool is_container_process(struct task_struct *task)
 {
@@ -62,13 +54,6 @@ static __always_inline bool is_container_process(struct task_struct *task)
     
     // Level > 0 means we're in a container namespace
     return ns_level > 0;
-}
-
-// Helper to get current event from scratch buffer
-static __always_inline struct event* get_scratch_event()
-{
-    __u32 key = 0;
-    return bpf_map_lookup_elem(&scratch_map, &key);
 }
 
 // Memory allocation tracking
@@ -181,7 +166,6 @@ int BPF_PROG(trace_tcp_v4_connect, struct sock *sk)
     e->data_len = 12;
     
     // CO-RE: safely read socket info
-    __u16 family = BPF_CORE_READ(sk, __sk_common.skc_family);
     __u32 saddr = BPF_CORE_READ(sk, __sk_common.skc_rcv_saddr);
     __u32 daddr = BPF_CORE_READ(sk, __sk_common.skc_daddr);
     __u16 sport = BPF_CORE_READ(sk, __sk_common.skc_num);
@@ -198,8 +182,8 @@ int BPF_PROG(trace_tcp_v4_connect, struct sock *sk)
 }
 
 // Process execution tracking
-SEC("tp_btf/sched/sched_process_exec")
-int BPF_PROG(trace_exec, struct trace_event_raw_sched_process_exec *ctx)
+SEC("tp_btf/sched_process_exec")
+int BPF_PROG(trace_exec)
 {
     struct task_struct *task = (struct task_struct *)bpf_get_current_task_btf();
     

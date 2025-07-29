@@ -122,7 +122,7 @@ done:
 		assert.NotZero(t, event.Timestamp)
 		assert.NotNil(t, event.Data)
 		assert.NotNil(t, event.Metadata)
-		
+
 		// Check metadata
 		assert.Contains(t, event.Metadata, "event_type")
 		assert.Contains(t, event.Metadata, "cpu")
@@ -152,7 +152,7 @@ func TestUnifiedCollector_Errors(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		
+
 		err := collector.Start(ctx)
 		require.NoError(t, err)
 		defer collector.Stop()
@@ -167,7 +167,7 @@ func TestUnifiedCollector_Errors(t *testing.T) {
 		collector := &UnifiedCollector{
 			events: make(chan collectors.RawEvent),
 		}
-		
+
 		// Should not panic
 		err := collector.Stop()
 		assert.NoError(t, err)
@@ -225,7 +225,7 @@ func TestParseUnifiedEvent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := parseUnifiedEvent(tt.data)
-			
+
 			if tt.wantNil {
 				assert.Nil(t, result)
 			} else {
@@ -247,7 +247,7 @@ func TestCreateMetadata(t *testing.T) {
 		"node": "test-node",
 		"env":  "test",
 	}
-	
+
 	collector := &UnifiedCollector{config: config}
 
 	tests := []struct {
@@ -316,7 +316,7 @@ func TestCreateMetadata(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			metadata := collector.createMetadata(tt.event)
-			
+
 			for k, v := range tt.expected {
 				assert.Equal(t, v, metadata[k])
 			}
