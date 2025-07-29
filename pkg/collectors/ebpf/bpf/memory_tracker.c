@@ -1,20 +1,24 @@
 //go:build ignore
 
 #include "headers/vmlinux.h"
-#include <bpf/bpf_helpers.h>
-#include <bpf/bpf_tracing.h>
-#include <bpf/bpf_core_read.h>
+#include "common.h"
 
-struct memory_event {
-    __u64 timestamp;
-    __u32 pid;
-    __u32 tid;
-    __u64 addr;
-    __u64 size;
-    __u8 event_type; // 0 = alloc, 1 = free
-    __u8 pad[3];
-    char comm[16];
-};
+// Map definition macros
+#define __uint(name, val) int(*name)[val]
+#define __type(name, val) typeof(val) *name
+#define __array(name, val) typeof(val) *name[]
+
+// Section attributes
+#define SEC(name) __attribute__((section(name), used))
+
+#define BPF_MAP_TYPE_PERF_EVENT_ARRAY 4
+#define BPF_F_CURRENT_CPU 0xffffffffULL
+
+// BPF helper prototypes
+static long (*bpf_ktime_get_ns)(void) = (void *) 5;
+static long (*bpf_get_current_pid_tgid)(void) = (void *) 14;
+static long (*bpf_get_current_comm)(void *buf, __u32 size_of_buf) = (void *) 16;
+static long (*bpf_perf_event_output)(void *ctx, void *map, __u64 flags, void *data, __u64 size) = (void *) 25;
 
 struct {
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
@@ -31,7 +35,7 @@ int trace_mm_page_alloc(struct trace_event_raw_mm_page_alloc *ctx) {
     event.pid = bpf_get_current_pid_tgid() >> 32;
     event.tid = bpf_get_current_pid_tgid() & 0xFFFFFFFF;
     event.size = (1 << ctx->order) << 12; // Convert order to pages to bytes
-    event.event_type = 0; // allocation
+    event.event_type = EVENT_MEMORY_ALLOC;
     
     bpf_get_current_comm(&event.comm, sizeof(event.comm));
     
@@ -48,7 +52,24 @@ int trace_mm_page_free(struct trace_event_raw_mm_page_free *ctx) {
     event.pid = bpf_get_current_pid_tgid() >> 32;
     event.tid = bpf_get_current_pid_tgid() & 0xFFFFFFFF;
     event.size = (1 << ctx->order) << 12; // Convert order to pages to bytes
-    event.event_type = 1; // free
+    event.event_type = EVENT_MEMORY_FREE;
+    
+    bpf_get_current_comm(&event.comm, sizeof(event.comm));
+    
+    bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
+    return 0;
+}
+
+// Trace OOM kills
+SEC("tracepoint/oom/oom_kill_process")
+int trace_oom_kill_process(void *ctx) {
+    struct memory_event event = {};
+    
+    event.timestamp = bpf_ktime_get_ns();
+    event.pid = bpf_get_current_pid_tgid() >> 32;
+    event.tid = bpf_get_current_pid_tgid() & 0xFFFFFFFF;
+    event.size = 0;
+    event.event_type = EVENT_OOM_KILL;
     
     bpf_get_current_comm(&event.comm, sizeof(event.comm));
     
