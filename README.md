@@ -34,11 +34,6 @@ Service Error → Pod OOMKill → Node Memory Pressure → Kernel Memory Allocat
 **What we have built so far:**
 
 ✅ **UnifiedEvent Format** - A single event structure with OTEL trace context and infrastructure context  
-✅ **Dual Layer eBPF Collector** - Preserves raw kernel data while producing UnifiedEvent for correlation  
-✅ **Unified Intelligence Pipeline** - Ring buffer + deterministic correlation in single pipeline (1M+ events/sec)  
-✅ **4 Pipeline Modes** - High-performance, Standard, Debug, Ring-buffer modes via builder pattern  
-✅ **DataFlow Intelligence Integration** - Rule-based correlation with OTEL trace propagation  
-✅ **Infrastructure Impact Analysis** - Technical severity, cascade risk, and SLO impact calculation  
 ✅ **Context Processing** - Infrastructure impact assessment with automated recommendations  
 ✅ **Adapters Layer** - Clean interfaces between implementations and pipeline stages  
 ✅ **Modular Intelligence Architecture** - Refactored 3,855 lines into 8 organized modules for maintainability  
@@ -65,19 +60,8 @@ Service Error → Pod OOMKill → Node Memory Pressure → Kernel Memory Allocat
 ✅ **Enhanced Correlation** - Improved OTEL trace propagation and K8s-native correlation  
 ✅ **Dual Layer eBPF Implementation** - Complete dual-path processing with raw data preservation  
 
-**What we're actively working on:**
 
-🔄 **Full Collector Integration** - Bringing K8s, Systemd, CNI into main binary  
-🔄 **Pattern Detection** - Automated infrastructure pattern discovery  
-🔄 **Advanced Correlation** - Complex multi-layer patterns  
-🔄 **UI/Dashboard** - Real-time visualization  
 
-**What we haven't built yet:**
-
-❌ Service mesh integration  
-❌ Cloud provider collectors  
-❌ Historical analysis  
-❌ Automated remediation  
 
 ## 🎯 Our Vision
 
@@ -219,74 +203,7 @@ go build ./...
 | **Performance** | 1M+ events/sec achieved with ring buffers | ✅ Optimized |
 | **Production Deployment** | Ready for real workloads | ✅ Ready |
 
-## 🚀 Unified Intelligence Pipeline
 
-Our unified pipeline system provides **4 different modes** optimized for different use cases, achieving **1M+ events/second** with ring buffers:
-
-### Pipeline Modes Available
-
-| Mode | Use Case | Performance | Features |
-|------|----------|-------------|----------|
-| **Ring Buffer** | Ultra-high throughput | 1M+ events/sec | Lock-free, zero-copy processing |
-| **High Performance** | Production workloads | 165k+ events/sec | Concurrent processing, metrics |
-| **Standard** | Balanced usage | 50k+ events/sec | Lower resource usage |
-| **Debug** | Development | 10k+ events/sec | Full tracing, profiling |
-
-### Quick Start - Multiple Creation Patterns
-
-```go
-import "github.com/yairfalse/tapio/pkg/intelligence/pipeline"
-
-// Method 1: Ring Buffer (Ultimate Performance)
-pipeline, err := pipeline.NewRingBufferPipeline()
-
-// Method 2: High Performance (Production Ready)
-pipeline, err := pipeline.NewHighPerformancePipeline()
-
-// Method 3: Builder Pattern (Full Control)
-pipeline, err := pipeline.NewPipelineBuilder().
-    WithMode(pipeline.PipelineModeRingBuffer).
-    WithBatchSize(10000).
-    WithMaxConcurrency(0). // Use all cores
-    EnableCorrelation(true).
-    Build()
-
-// Method 4: Custom Configuration
-config := pipeline.RingBufferPipelineConfig()
-config.BatchSize = 5000 // Custom settings
-pipeline, err := pipeline.NewPipeline(config)
-
-if err != nil {
-    log.Fatal(err)
-}
-
-// Start processing
-ctx := context.Background()
-pipeline.Start(ctx)
-defer pipeline.Shutdown()
-
-// Process events - unified interface
-event := &domain.UnifiedEvent{
-    ID:        "evt-123",
-    Type:      domain.EventTypeSystem,
-    Timestamp: time.Now(),
-    Source:    "kubernetes",
-}
-pipeline.ProcessEvent(event)
-
-// Get metrics
-metrics := pipeline.GetMetrics()
-fmt.Printf("Processed: %d events\n", metrics.EventsProcessed)
-```
-
-### Performance Benchmarks
-
-| Mode | Throughput | Latency P99 | Memory/Event | CPU Efficiency |
-|------|------------|-------------|--------------|----------------|
-| **Ring Buffer** | 1M+ events/sec | < 1ms | 32 bytes | 15k+ events/core/sec |
-| **High Performance** | 165k events/sec | 9.74ms | 48 bytes | 5k+ events/core/sec |
-| **Standard** | 50k events/sec | 25ms | 64 bytes | 2k+ events/core/sec |
-| **Debug** | 10k events/sec | 100ms | 128 bytes | 500 events/core/sec |
 
 ### Intelligence Features
 
@@ -294,13 +211,9 @@ fmt.Printf("Processed: %d events\n", metrics.EventsProcessed)
 ✅ **Temporal Correlation** - Time-based pattern detection and co-occurrence analysis  
 ✅ **Infrastructure Impact** - Cascade risk and technical severity assessment  
 ✅ **Context Processing** - Event validation, confidence scoring, and enrichment  
-✅ **Recommended Actions** - Intelligent suggestions based on infrastructure impact  
 ✅ **Real-time Processing** - Sub-millisecond correlation with persistent storage  
 ✅ **Modular Architecture** - 8 well-organized modules for maintainability  
 ✅ **Production Resilience** - Circuit breaker, rate limiting, health monitoring, and error recovery  
-✅ **Recovery Strategies** - Advanced error handling for timeout, memory pressure, and correlation failures  
-✅ **Dual Layer eBPF Processing** - Raw kernel data preservation with DualPathProcessor  
-✅ **Raw Event Storage** - Configurable retention of detailed kernel events for security and debugging  
 
 [See detailed benchmarks →](docs/performance/benchmarks.md)
 
