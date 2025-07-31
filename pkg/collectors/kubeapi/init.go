@@ -1,4 +1,4 @@
-package k8s
+package kubeapi
 
 import (
 	"fmt"
@@ -8,11 +8,11 @@ import (
 )
 
 func init() {
-	// Register the K8s collector factory
-	registry.Register("k8s", NewCollectorFromConfig)
+	// Register the KubeAPI collector factory
+	registry.Register("kubeapi", NewCollectorFromConfig)
 }
 
-// NewCollectorFromConfig creates a new K8s collector from configuration
+// NewCollectorFromConfig creates a new KubeAPI collector from configuration
 func NewCollectorFromConfig(config map[string]interface{}) (collectors.Collector, error) {
 	// Parse configuration
 	collectorConfig := collectors.DefaultCollectorConfig()
@@ -30,7 +30,7 @@ func NewCollectorFromConfig(config map[string]interface{}) (collectors.Collector
 		}
 	}
 
-	// K8s specific configuration
+	// KubeAPI specific configuration
 	if namespace, ok := config["namespace"].(string); ok {
 		collectorConfig.Labels["namespace"] = namespace
 	}
@@ -39,10 +39,10 @@ func NewCollectorFromConfig(config map[string]interface{}) (collectors.Collector
 		collectorConfig.Labels["kubeconfig"] = kubeconfig
 	}
 
-	// Create K8s collector
-	collector, err := NewCollector(collectorConfig)
+	// Create KubeAPI collector
+	collector, err := NewCollectorFromCollectorConfig(collectorConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create k8s collector: %w", err)
+		return nil, fmt.Errorf("failed to create kubeapi collector: %w", err)
 	}
 
 	return collector, nil

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/yairfalse/tapio/pkg/collectors"
-	"github.com/yairfalse/tapio/pkg/collectors/k8s"
+	"github.com/yairfalse/tapio/pkg/collectors/kubeapi"
 )
 
 func main() {
@@ -23,10 +23,10 @@ func main() {
 		},
 	}
 
-	// Create K8s collector
-	collector, err := k8s.NewMinimalK8sCollector(config)
+	// Create KubeAPI collector
+	collector, err := kubeapi.NewCollectorFromCollectorConfig(config)
 	if err != nil {
-		log.Fatalf("Failed to create K8s collector: %v", err)
+		log.Fatalf("Failed to create KubeAPI collector: %v", err)
 	}
 
 	// Start collector
@@ -59,7 +59,7 @@ func main() {
 			}
 
 			// Special handling for K8s syscall events
-			if event.Type == "k8s_syscall" {
+			if event.Type == "kubeapi_syscall" {
 				fmt.Println("K8s Syscall Event Detected!")
 			}
 		}
