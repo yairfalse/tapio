@@ -35,7 +35,7 @@ func TestCollector(t *testing.T) {
 	if name != "etcd" && name != "etcd-ebpf" {
 		t.Errorf("Expected name 'etcd' or 'etcd-ebpf', got '%s'", name)
 	}
-	
+
 	if !collector.IsHealthy() {
 		t.Error("Collector should be healthy initially")
 	}
@@ -130,7 +130,7 @@ func TestCollectorContextCancellation(t *testing.T) {
 	// Create cancellable context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel() // Always call cancel to avoid leak
-	
+
 	err = collector.Start(ctx)
 	if err != nil {
 		t.Logf("Expected error starting collector without etcd server: %v", err)

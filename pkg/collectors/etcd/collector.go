@@ -168,13 +168,13 @@ func (c *Collector) collect() {
 // processWatchEvent processes an etcd watch event
 func (c *Collector) processWatchEvent(event *clientv3.Event) {
 	data := map[string]interface{}{
-		"type":         event.Type.String(),
-		"key":          string(event.Kv.Key),
-		"value":        string(event.Kv.Value),
+		"type":            event.Type.String(),
+		"key":             string(event.Kv.Key),
+		"value":           string(event.Kv.Value),
 		"create_revision": event.Kv.CreateRevision,
-		"mod_revision":   event.Kv.ModRevision,
-		"version":       event.Kv.Version,
-		"lease":         event.Kv.Lease,
+		"mod_revision":    event.Kv.ModRevision,
+		"version":         event.Kv.Version,
+		"lease":           event.Kv.Lease,
 	}
 
 	// Add previous key-value if this is an update
@@ -217,11 +217,11 @@ func (c *Collector) collectClusterStatus() {
 	c.mu.Unlock()
 
 	data := map[string]interface{}{
-		"version":        status.Version,
-		"db_size":        status.DbSize,
-		"leader":         status.Leader,
-		"raft_index":     status.RaftIndex,
-		"raft_term":      status.RaftTerm,
+		"version":            status.Version,
+		"db_size":            status.DbSize,
+		"leader":             status.Leader,
+		"raft_index":         status.RaftIndex,
+		"raft_term":          status.RaftTerm,
 		"raft_applied_index": status.RaftAppliedIndex,
 	}
 

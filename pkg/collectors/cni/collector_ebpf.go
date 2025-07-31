@@ -193,10 +193,10 @@ func (c *Collector) processRawSyscallTrace(record perf.Record) {
 		Type:      "cni_trace",
 		Data:      data,
 		Metadata: map[string]string{
-			"source":      "ebpf",
-			"cni_plugin":  c.detectedCNI,
-			"trace_type":  "raw_syscall",
-			"data_size":   fmt.Sprintf("%d", len(record.RawSample)),
+			"source":     "ebpf",
+			"cni_plugin": c.detectedCNI,
+			"trace_type": "raw_syscall",
+			"data_size":  fmt.Sprintf("%d", len(record.RawSample)),
 		},
 	}
 
@@ -247,38 +247,38 @@ func (c *Collector) getEventTypeName(eventType uint32) string {
 func loadCNIeBPFSpec() (*ebpf.CollectionSpec, error) {
 	// Real eBPF program that traces execve syscalls for CNI binaries
 	execveProg := asm.Instructions{
-		// Load syscall arguments  
-		asm.LoadMem(asm.R1, asm.R1, 16, asm.Word),     // filename from pt_regs
-		
+		// Load syscall arguments
+		asm.LoadMem(asm.R1, asm.R1, 16, asm.Word), // filename from pt_regs
+
 		// Check if filename contains "/opt/cni/bin/" or "/usr/libexec/cni/"
 		asm.Mov.Imm(asm.R2, 0),                        // Clear R2
 		asm.Call.Imm(asm.R0, 1, "bpf_probe_read_str"), // bpf_probe_read_str (helper)
-		
+
 		// For now, just submit an event for any execve
-		asm.Mov.Imm(asm.R0, 0),                        // Return 0 (success)
+		asm.Mov.Imm(asm.R0, 0), // Return 0 (success)
 		asm.Return(),
 	}
 
 	// eBPF program for clone syscall with CLONE_NEWNET
 	cloneProg := asm.Instructions{
 		// Check clone flags for CLONE_NEWNET (0x40000000)
-		asm.LoadMem(asm.R1, asm.R1, 16, asm.Word),     // flags from pt_regs
-		asm.Mov.Imm(asm.R2, 0x40000000),               // CLONE_NEWNET flag
-		asm.And.Reg(asm.R1, asm.R2),                   // Check if flag is set
-		asm.JEq.Imm(asm.R1, 0, "exit"),                // Jump if not CLONE_NEWNET
-		
+		asm.LoadMem(asm.R1, asm.R1, 16, asm.Word), // flags from pt_regs
+		asm.Mov.Imm(asm.R2, 0x40000000),           // CLONE_NEWNET flag
+		asm.And.Reg(asm.R1, asm.R2),               // Check if flag is set
+		asm.JEq.Imm(asm.R1, 0, "exit"),            // Jump if not CLONE_NEWNET
+
 		// Submit network namespace creation event
 		asm.Mov.Imm(asm.R0, 0).WithSymbol("exit"),
 		asm.Return(),
 	}
 
-	// eBPF program for setns syscall  
+	// eBPF program for setns syscall
 	setnsProg := asm.Instructions{
 		// Check nstype for CLONE_NEWNET
-		asm.LoadMem(asm.R2, asm.R1, 24, asm.Word),     // nstype from pt_regs  
-		asm.Mov.Imm(asm.R3, 0x40000000),               // CLONE_NEWNET
-		asm.JNE.Reg(asm.R2, asm.R3, "exit"),           // Jump if not CLONE_NEWNET
-		
+		asm.LoadMem(asm.R2, asm.R1, 24, asm.Word), // nstype from pt_regs
+		asm.Mov.Imm(asm.R3, 0x40000000),           // CLONE_NEWNET
+		asm.JNE.Reg(asm.R2, asm.R3, "exit"),       // Jump if not CLONE_NEWNET
+
 		// Submit namespace change event
 		asm.Mov.Imm(asm.R0, 0).WithSymbol("exit"),
 		asm.Return(),
@@ -293,7 +293,7 @@ func loadCNIeBPFSpec() (*ebpf.CollectionSpec, error) {
 			},
 			"trace_clone": {
 				Type:         ebpf.TracePoint,
-				License:      "GPL", 
+				License:      "GPL",
 				Instructions: cloneProg,
 			},
 			"trace_setns": {

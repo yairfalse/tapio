@@ -408,19 +408,19 @@ func (o *networkPolicyObjects) Close() error {
 			errors = append(errors, fmt.Errorf("closing policy_events map: %w", err))
 		}
 	}
-	
+
 	if o.ActivePolicies != nil {
 		if err := o.ActivePolicies.Close(); err != nil {
 			errors = append(errors, fmt.Errorf("closing active_policies map: %w", err))
 		}
 	}
-	
+
 	if o.PodMetadataMap != nil {
 		if err := o.PodMetadataMap.Close(); err != nil {
 			errors = append(errors, fmt.Errorf("closing pod_metadata_map map: %w", err))
 		}
 	}
-	
+
 	// Close programs
 	if o.KprobeNfHookSlow != nil {
 		if err := o.KprobeNfHookSlow.Close(); err != nil {
@@ -432,7 +432,7 @@ func (o *networkPolicyObjects) Close() error {
 	if len(errors) > 0 {
 		return fmt.Errorf("cleanup errors: %v", errors)
 	}
-	
+
 	return nil
 }
 
@@ -472,7 +472,7 @@ type networkPolicyPodMetadata struct {
 func loadNetworkPolicyObjects(obj *networkPolicyObjects, opts *ebpf.CollectionOptions) error {
 	// Create simple eBPF spec for development/testing
 	// In production, this would be replaced by bpf2go generated code
-	
+
 	spec := &ebpf.CollectionSpec{
 		Maps: map[string]*ebpf.MapSpec{
 			"policy_events": {
@@ -481,13 +481,13 @@ func loadNetworkPolicyObjects(obj *networkPolicyObjects, opts *ebpf.CollectionOp
 			},
 			"active_policies": {
 				Type:       ebpf.Hash,
-				KeySize:    4,  // uint32
+				KeySize:    4, // uint32
 				ValueSize:  uint32(unsafe.Sizeof(networkPolicyPolicyRule{})),
 				MaxEntries: 1024,
 			},
 			"pod_metadata_map": {
 				Type:       ebpf.Hash,
-				KeySize:    4,  // uint32 (IP)
+				KeySize:    4, // uint32 (IP)
 				ValueSize:  uint32(unsafe.Sizeof(networkPolicyPodMetadata{})),
 				MaxEntries: 10000,
 			},
@@ -499,21 +499,21 @@ func loadNetworkPolicyObjects(obj *networkPolicyObjects, opts *ebpf.CollectionOp
 				// Real kprobe program for netfilter hook tracing
 				Instructions: asm.Instructions{
 					// Get struct sk_buff pointer from function arguments
-					asm.LoadMem(asm.R1, asm.R1, 8, asm.DWord),      // skb = arg1
-					asm.JEq.Imm(asm.R1, 0, "exit"),                 // Exit if skb is NULL
-					
+					asm.LoadMem(asm.R1, asm.R1, 8, asm.DWord), // skb = arg1
+					asm.JEq.Imm(asm.R1, 0, "exit"),            // Exit if skb is NULL
+
 					// Extract IP header info from sk_buff
-					asm.LoadMem(asm.R2, asm.R1, 16, asm.Word),      // network_header offset
-					asm.LoadMem(asm.R3, asm.R1, 184, asm.DWord),    // head pointer
-					asm.Add.Reg(asm.R3, asm.R2),                    // ip_header = head + offset
-					
+					asm.LoadMem(asm.R2, asm.R1, 16, asm.Word),   // network_header offset
+					asm.LoadMem(asm.R3, asm.R1, 184, asm.DWord), // head pointer
+					asm.Add.Reg(asm.R3, asm.R2),                 // ip_header = head + offset
+
 					// Read source IP (first 4 bytes of IP header + 12)
-					asm.LoadMem(asm.R4, asm.R3, 12, asm.Word),      // src_ip
-					asm.LoadMem(asm.R5, asm.R3, 16, asm.Word),      // dst_ip
-					
+					asm.LoadMem(asm.R4, asm.R3, 12, asm.Word), // src_ip
+					asm.LoadMem(asm.R5, asm.R3, 16, asm.Word), // dst_ip
+
 					// For now, just record that we saw a packet
 					// In production, this would write to a perf buffer
-					asm.Mov.Imm(asm.R0, 0).WithSymbol("exit"),      // Return 0
+					asm.Mov.Imm(asm.R0, 0).WithSymbol("exit"), // Return 0
 					asm.Return(),
 				},
 			},
