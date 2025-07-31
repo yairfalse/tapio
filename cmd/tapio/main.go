@@ -12,6 +12,7 @@ import (
 
 	"github.com/yairfalse/tapio/pkg/collectors"
 	"github.com/yairfalse/tapio/pkg/collectors/registry"
+	"github.com/yairfalse/tapio/pkg/config"
 
 	// Import collectors to trigger init() registration
 	_ "github.com/yairfalse/tapio/pkg/collectors/cni"
@@ -31,6 +32,27 @@ func main() {
 
 	log.Println("Starting Tapio observability platform...")
 
+	// Load configuration
+	var cfg *config.Config
+	var err error
+	
+	if *configFile != "" {
+		cfg, err = config.LoadConfig(*configFile)
+		if err != nil {
+			log.Fatalf("Failed to load config: %v", err)
+		}
+		log.Printf("Loaded configuration from %s", *configFile)
+	} else {
+		// Use defaults if no config file
+		cfg = &config.Config{}
+		cfg.Pipeline.Endpoint = "localhost:50051"
+		cfg.Pipeline.Timeout = 30
+		cfg.Pipeline.Retries = 3
+		cfg.Collectors.BufferSize = 1000
+		cfg.Collectors.Enabled = parseCollectorList(*collectorList)
+		cfg.Collectors.Labels = make(map[string]string)
+	}
+
 	// Create root context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -39,8 +61,10 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Parse enabled collectors
-	enabledCollectors := parseCollectorList(*collectorList)
+	// Get enabled collectors from config
+	enabledCollectors := cfg.Collectors.Enabled
+	log.Printf("Pipeline endpoint: %s", cfg.Pipeline.Endpoint)
+	log.Printf("Enabled collectors: %v", enabledCollectors)
 	
 	// Start collectors
 	var wg sync.WaitGroup
@@ -49,10 +73,9 @@ func main() {
 	for _, name := range enabledCollectors {
 		log.Printf("Starting %s collector...", name)
 		
-		// Create collector from registry
-		collector, err := registry.CreateCollector(name, map[string]interface{}{
-			"buffer_size": 1000,
-		})
+		// Create collector from registry with unified config
+		collectorConfig := cfg.Collectors.ToCollectorConfig()
+		collector, err := registry.CreateCollector(name, collectorConfig)
 		if err != nil {
 			log.Printf("Failed to create %s collector: %v", name, err)
 			continue
