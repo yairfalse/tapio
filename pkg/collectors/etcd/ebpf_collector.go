@@ -305,38 +305,38 @@ func (c *EBPFCollector) createEtcdEBPFSpec() (*ebpf.CollectionSpec, error) {
 	// eBPF program to trace write syscalls from etcd processes
 	writeProg := asm.Instructions{
 		// Load file descriptor and buffer info from pt_regs
-		asm.LoadMem(asm.R1, asm.R1, 16, asm.Word),      // fd from syscall args
-		asm.LoadMem(asm.R2, asm.R1, 24, asm.DWord),     // buf pointer
-		asm.LoadMem(asm.R3, asm.R1, 32, asm.Word),      // count
-		
+		asm.LoadMem(asm.R1, asm.R1, 16, asm.Word),  // fd from syscall args
+		asm.LoadMem(asm.R2, asm.R1, 24, asm.DWord), // buf pointer
+		asm.LoadMem(asm.R3, asm.R1, 32, asm.Word),  // count
+
 		// Check if this is etcd process (simplified - would check comm/pid)
 		// For now, monitor all write syscalls
 		asm.Mov.Imm(asm.R0, 0),
 		asm.Return(),
 	}
-	
+
 	// eBPF program to trace fsync syscalls (WAL persistence)
 	fsyncProg := asm.Instructions{
 		// Load file descriptor from syscall args
-		asm.LoadMem(asm.R1, asm.R1, 16, asm.Word),      // fd
-		
+		asm.LoadMem(asm.R1, asm.R1, 16, asm.Word), // fd
+
 		// Check if fd corresponds to etcd WAL file
 		// For now, record all fsync calls
 		asm.Mov.Imm(asm.R0, 0),
 		asm.Return(),
 	}
-	
+
 	// eBPF program to trace openat syscalls (database access)
 	openatProg := asm.Instructions{
 		// Load pathname from syscall args
-		asm.LoadMem(asm.R2, asm.R1, 24, asm.DWord),     // pathname pointer
-		
+		asm.LoadMem(asm.R2, asm.R1, 24, asm.DWord), // pathname pointer
+
 		// Check if path contains \"etcd\" or \".db\"
-		// For now, monitor all openat calls  
+		// For now, monitor all openat calls
 		asm.Mov.Imm(asm.R0, 0),
 		asm.Return(),
 	}
-	
+
 	return &ebpf.CollectionSpec{
 		Maps: map[string]*ebpf.MapSpec{
 			"etcd_events": {
@@ -345,7 +345,7 @@ func (c *EBPFCollector) createEtcdEBPFSpec() (*ebpf.CollectionSpec, error) {
 			},
 			"etcd_processes": {
 				Type:       ebpf.Hash,
-				KeySize:    4,  // PID
+				KeySize:    4, // PID
 				ValueSize:  uint32(unsafe.Sizeof(etcdProcessInfo{})),
 				MaxEntries: 1024,
 			},
