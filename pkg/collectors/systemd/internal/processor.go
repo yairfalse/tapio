@@ -162,21 +162,21 @@ func (p *eventProcessor) createApplicationContext(raw core.RawEvent) *domain.App
 
 // createImpactContext creates complete impact context with all fields
 func (p *eventProcessor) createImpactContext(raw core.RawEvent, severity string) *domain.ImpactContext {
-	businessImpact := p.calculateBusinessImpact(raw, severity)
+	infrastructureImpact := p.calculateInfrastructureImpact(raw, severity)
 	affectedServices := p.determineAffectedServices(raw)
-	customerFacing := p.isCustomerFacing(raw)
+	systemCritical := p.isSystemCritical(raw)
 	sloImpact := p.hasSLOImpact(raw, severity)
-	revenueImpacting := p.isRevenueImpacting(raw)
-	affectedUsers := p.estimateAffectedUsers(raw)
+	cascadeRisk := p.hasCascadeRisk(raw)
+	affectedComponents := p.estimateAffectedComponents(raw)
 
 	return &domain.ImpactContext{
-		Severity:         severity,
-		BusinessImpact:   businessImpact,
-		AffectedServices: affectedServices,
-		CustomerFacing:   customerFacing,
-		SLOImpact:        sloImpact,
-		RevenueImpacting: revenueImpacting,
-		AffectedUsers:    int(affectedUsers),
+		Severity:             severity,
+		InfrastructureImpact: infrastructureImpact,
+		AffectedServices:     affectedServices,
+		SystemCritical:       systemCritical,
+		SLOImpact:            sloImpact,
+		CascadeRisk:          cascadeRisk,
+		AffectedComponents:   int(affectedComponents),
 	}
 }
 
@@ -398,8 +398,8 @@ func (p *eventProcessor) determineSeverity(raw core.RawEvent) string {
 	return "info"
 }
 
-// calculateBusinessImpact calculates business impact score
-func (p *eventProcessor) calculateBusinessImpact(raw core.RawEvent, severity string) float64 {
+// calculateInfrastructureImpact calculates infrastructure impact score
+func (p *eventProcessor) calculateInfrastructureImpact(raw core.RawEvent, severity string) float64 {
 	base := 0.1
 
 	// Adjust based on severity
@@ -471,10 +471,10 @@ func (p *eventProcessor) determineAffectedServices(raw core.RawEvent) []string {
 	return services
 }
 
-// isCustomerFacing determines if the service affects customers
-func (p *eventProcessor) isCustomerFacing(raw core.RawEvent) bool {
-	// Application services are often customer-facing
-	customerFacingPatterns := []string{
+// isSystemCritical determines if the service is critical for system operation
+func (p *eventProcessor) isSystemCritical(raw core.RawEvent) bool {
+	// Infrastructure services that are critical for system operation
+	systemCriticalPatterns := []string{
 		"nginx",
 		"apache",
 		"httpd",
@@ -491,7 +491,7 @@ func (p *eventProcessor) isCustomerFacing(raw core.RawEvent) bool {
 	}
 
 	unitLower := strings.ToLower(raw.UnitName)
-	for _, pattern := range customerFacingPatterns {
+	for _, pattern := range systemCriticalPatterns {
 		if strings.Contains(unitLower, pattern) {
 			return true
 		}
@@ -508,8 +508,8 @@ func (p *eventProcessor) hasSLOImpact(raw core.RawEvent, severity string) bool {
 		return true
 	}
 
-	// Customer-facing service failures impact SLOs
-	if (raw.Type == core.EventTypeFailure || raw.NewState == core.StateFailed) && p.isCustomerFacing(raw) {
+	// System-critical service failures impact SLOs
+	if (raw.Type == core.EventTypeFailure || raw.NewState == core.StateFailed) && p.isSystemCritical(raw) {
 		return true
 	}
 
@@ -521,28 +521,28 @@ func (p *eventProcessor) hasSLOImpact(raw core.RawEvent, severity string) bool {
 	return false
 }
 
-// isRevenueImpacting determines if the event impacts revenue
-func (p *eventProcessor) isRevenueImpacting(raw core.RawEvent) bool {
-	// Check for revenue-critical services
-	revenuePatterns := []string{
-		"payment",
-		"billing",
-		"checkout",
-		"transaction",
-		"stripe",
-		"paypal",
-		"commerce",
-		"shop",
+// hasCascadeRisk determines if the event might cause cascading failures
+func (p *eventProcessor) hasCascadeRisk(raw core.RawEvent) bool {
+	// Check for services that can cause cascading failures
+	cascadeRiskPatterns := []string{
+		"network",
+		"dns",
+		"load-balancer",
+		"proxy",
+		"gateway",
+		"router",
+		"firewall",
+		"authentication",
 	}
 
 	unitLower := strings.ToLower(raw.UnitName)
-	for _, pattern := range revenuePatterns {
+	for _, pattern := range cascadeRiskPatterns {
 		if strings.Contains(unitLower, pattern) {
 			return true
 		}
 	}
 
-	// Database failures can impact revenue
+	// Database failures can cause cascade effects
 	if raw.Type == core.EventTypeFailure {
 		if strings.Contains(unitLower, "mysql") || strings.Contains(unitLower, "postgres") || strings.Contains(unitLower, "mongo") {
 			return true
@@ -552,28 +552,28 @@ func (p *eventProcessor) isRevenueImpacting(raw core.RawEvent) bool {
 	return false
 }
 
-// estimateAffectedUsers estimates number of affected users
-func (p *eventProcessor) estimateAffectedUsers(raw core.RawEvent) int64 {
-	// No users affected for successful operations
+// estimateAffectedComponents estimates number of affected components
+func (p *eventProcessor) estimateAffectedComponents(raw core.RawEvent) int64 {
+	// No components affected for successful operations
 	if raw.Type == core.EventTypeStart && raw.Result == "success" {
 		return 0
 	}
 
-	// Infrastructure services don't directly affect users
-	if !p.isCustomerFacing(raw) {
-		return 0
+	// Infrastructure services affect dependent components
+	if !p.isSystemCritical(raw) {
+		return 1 // Only the service itself
 	}
 
-	// Customer-facing service failures affect many users
+	// System-critical service failures affect many components
 	if raw.Type == core.EventTypeFailure || raw.NewState == core.StateFailed {
-		if p.isCustomerFacing(raw) {
-			return 1000 // Estimate based on service impact
+		if p.isSystemCritical(raw) {
+			return 10 // Estimate based on typical dependencies
 		}
 	}
 
-	// Service restarts might cause brief interruptions
-	if raw.Type == core.EventTypeRestart && p.isCustomerFacing(raw) {
-		return 100
+	// Service restarts might affect dependent components
+	if raw.Type == core.EventTypeRestart && p.isSystemCritical(raw) {
+		return 5
 	}
 
 	return 0
