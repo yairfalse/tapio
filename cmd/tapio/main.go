@@ -123,4 +123,3 @@ func processManagerEvents(ctx context.Context, mgr *manager.CollectorManager) {
 		}
 	}
 }
-
