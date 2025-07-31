@@ -1,10 +1,9 @@
-package systemd
+package ebpf
 
 import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 	"unsafe"
@@ -14,21 +13,21 @@ import (
 	"github.com/yairfalse/tapio/pkg/collectors"
 )
 
-// SystemdEvent represents a systemd event from eBPF
-type SystemdEvent struct {
+// KernelEvent represents a kernel event from eBPF
+type KernelEvent struct {
 	Timestamp uint64
 	PID       uint32
-	PPID      uint32
+	TID       uint32
 	EventType uint32
-	ExitCode  uint32
+	Size      uint64
 	Comm      [16]byte
-	Filename  [256]byte
+	Data      [64]byte
 }
 
-// Collector implements minimal systemd monitoring via eBPF
+// Collector implements minimal kernel monitoring via eBPF
 type Collector struct {
 	name    string
-	objs    *systemdMonitorObjects
+	objs    *kernelmonitorObjects
 	links   []link.Link
 	reader  *ringbuf.Reader
 	events  chan collectors.RawEvent
@@ -37,11 +36,12 @@ type Collector struct {
 	healthy bool
 }
 
-// NewCollector creates a new minimal systemd collector
+// NewCollector creates a new minimal eBPF collector
 func NewCollector(name string) (*Collector, error) {
 	return &Collector{
-		name:   name,
-		events: make(chan collectors.RawEvent, 1000),
+		name:    name,
+		events:  make(chan collectors.RawEvent, 1000),
+		healthy: true,
 	}, nil
 }
 
@@ -55,33 +55,40 @@ func (c *Collector) Start(ctx context.Context) error {
 	c.ctx, c.cancel = context.WithCancel(ctx)
 
 	// Load eBPF program
-	spec, err := loadSystemdMonitor()
+	spec, err := loadKernelmonitor()
 	if err != nil {
 		return fmt.Errorf("failed to load eBPF spec: %w", err)
 	}
 
-	c.objs = &systemdMonitorObjects{}
+	c.objs = &kernelmonitorObjects{}
 	if err := spec.LoadAndAssign(c.objs, nil); err != nil {
 		return fmt.Errorf("failed to load eBPF objects: %w", err)
 	}
 
-	// Populate systemd PIDs
-	if err := c.populateSystemdPIDs(); err != nil {
-		return fmt.Errorf("failed to populate systemd PIDs: %w", err)
+	// Populate container PIDs
+	if err := c.populateContainerPIDs(); err != nil {
+		return fmt.Errorf("failed to populate container PIDs: %w", err)
 	}
 
-	// Attach tracepoints
-	execLink, err := link.Tracepoint("syscalls", "sys_enter_execve", c.objs.TraceExec, nil)
+	// Attach tracepoints for memory tracking
+	mallocLink, err := link.Tracepoint("kmem", "kmalloc", c.objs.TraceMalloc, nil)
 	if err != nil {
-		return fmt.Errorf("failed to attach execve tracepoint: %w", err)
+		return fmt.Errorf("failed to attach kmalloc tracepoint: %w", err)
+	}
+	c.links = append(c.links, mallocLink)
+
+	freeLink, err := link.Tracepoint("kmem", "kfree", c.objs.TraceFree, nil)
+	if err != nil {
+		return fmt.Errorf("failed to attach kfree tracepoint: %w", err)
+	}
+	c.links = append(c.links, freeLink)
+
+	// Attach process execution tracking
+	execLink, err := link.Tracepoint("sched", "sched_process_exec", c.objs.TraceExec, nil)
+	if err != nil {
+		return fmt.Errorf("failed to attach exec tracepoint: %w", err)
 	}
 	c.links = append(c.links, execLink)
-
-	exitLink, err := link.Tracepoint("syscalls", "sys_enter_exit", c.objs.TraceExit, nil)
-	if err != nil {
-		return fmt.Errorf("failed to attach exit tracepoint: %w", err)
-	}
-	c.links = append(c.links, exitLink)
 
 	// Open ring buffer
 	c.reader, err = ringbuf.NewReader(c.objs.Events)
@@ -132,44 +139,44 @@ func (c *Collector) IsHealthy() bool {
 	return c.healthy
 }
 
-// populateSystemdPIDs finds and adds systemd-related PIDs to the map
-func (c *Collector) populateSystemdPIDs() error {
-	// Find systemd PIDs (PID 1 and its children)
-	pids := []uint32{1} // systemd is always PID 1
-
-	// Add some common systemd PIDs by scanning /proc
+// populateContainerPIDs finds and adds container PIDs to the map
+func (c *Collector) populateContainerPIDs() error {
+	// Find container PIDs by checking /proc for cgroup namespaces
 	procs, err := os.ReadDir("/proc")
 	if err != nil {
 		return err
 	}
 
+	var containerPIDs []uint32
 	for _, proc := range procs {
 		if !proc.IsDir() {
 			continue
 		}
 
-		pid, err := strconv.ParseUint(proc.Name(), 10, 32)
+		// Check if this is a container process by examining cgroup
+		cgroupPath := fmt.Sprintf("/proc/%s/cgroup", proc.Name())
+		cgroupData, err := os.ReadFile(cgroupPath)
 		if err != nil {
 			continue
 		}
 
-		// Read comm to check if it's systemd-related
-		commPath := fmt.Sprintf("/proc/%d/comm", pid)
-		comm, err := os.ReadFile(commPath)
-		if err != nil {
-			continue
-		}
+		cgroupStr := string(cgroupData)
+		if strings.Contains(cgroupStr, "docker") ||
+			strings.Contains(cgroupStr, "containerd") ||
+			strings.Contains(cgroupStr, "kubepods") {
 
-		commStr := strings.TrimSpace(string(comm))
-		if strings.Contains(commStr, "systemd") {
-			pids = append(pids, uint32(pid))
+			if pid, err := fmt.Sscanf(proc.Name(), "%d", new(uint32)); err == nil && pid == 1 {
+				var actualPID uint32
+				fmt.Sscanf(proc.Name(), "%d", &actualPID)
+				containerPIDs = append(containerPIDs, actualPID)
+			}
 		}
 	}
 
 	// Add PIDs to eBPF map
 	var value uint8 = 1
-	for _, pid := range pids {
-		if err := c.objs.SystemdPids.Put(pid, value); err != nil {
+	for _, pid := range containerPIDs {
+		if err := c.objs.ContainerPids.Put(&pid, &value); err != nil {
 			// Log but don't fail - just skip this PID
 			continue
 		}
@@ -196,16 +203,16 @@ func (c *Collector) processEvents() {
 		}
 
 		// Parse event
-		if len(record.RawSample) < int(unsafe.Sizeof(SystemdEvent{})) {
+		if len(record.RawSample) < int(unsafe.Sizeof(KernelEvent{})) {
 			continue
 		}
 
-		var event SystemdEvent
+		var event KernelEvent
 		// Simple binary unmarshaling from raw bytes
 		if len(record.RawSample) != int(unsafe.Sizeof(event)) {
 			continue
 		}
-		event = *(*SystemdEvent)(unsafe.Pointer(&record.RawSample[0]))
+		event = *(*KernelEvent)(unsafe.Pointer(&record.RawSample[0]))
 
 		// Convert to RawEvent - NO BUSINESS LOGIC
 		rawEvent := collectors.RawEvent{
@@ -213,12 +220,11 @@ func (c *Collector) processEvents() {
 			Type:      c.eventTypeToString(event.EventType),
 			Data:      record.RawSample, // Raw eBPF event data
 			Metadata: map[string]string{
-				"collector": "systemd",
+				"collector": "ebpf",
 				"pid":       fmt.Sprintf("%d", event.PID),
-				"ppid":      fmt.Sprintf("%d", event.PPID),
+				"tid":       fmt.Sprintf("%d", event.TID),
 				"comm":      c.nullTerminatedString(event.Comm[:]),
-				"filename":  c.nullTerminatedString(event.Filename[:]),
-				"exit_code": fmt.Sprintf("%d", event.ExitCode),
+				"size":      fmt.Sprintf("%d", event.Size),
 			},
 		}
 
@@ -236,11 +242,11 @@ func (c *Collector) processEvents() {
 func (c *Collector) eventTypeToString(eventType uint32) string {
 	switch eventType {
 	case 1:
-		return "exec"
+		return "memory_alloc"
 	case 2:
-		return "exit"
+		return "memory_free"
 	case 3:
-		return "kill"
+		return "process_exec"
 	default:
 		return "unknown"
 	}
