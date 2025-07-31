@@ -282,4 +282,3 @@ func (m *CollectorManager) checkHealth() {
 		}
 	}
 }
-

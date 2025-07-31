@@ -148,4 +148,3 @@ func (m *CollectorManager) handleMetrics(w http.ResponseWriter, r *http.Request)
 		fmt.Fprintf(w, "tapio_collector_uptime_seconds{collector=\"%s\"} %.0f\n", h.Name, uptime)
 	}
 }
-
