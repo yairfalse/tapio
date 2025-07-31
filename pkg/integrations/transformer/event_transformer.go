@@ -110,8 +110,8 @@ func (t *EventTransformer) parseRawData(event *domain.UnifiedEvent, raw collecto
 		t.parseSystemdData(event, raw.Data)
 	case "ebpf":
 		t.parseEBPFData(event, raw.Data)
-	case "k8s":
-		t.parseK8sData(event, raw.Data)
+	case "kubeapi":
+		t.parseKubeAPIData(event, raw.Data)
 	case "etcd":
 		t.parseEtcdData(event, raw.Data)
 	case "cni":
@@ -180,7 +180,7 @@ func (t *EventTransformer) parseEBPFData(event *domain.UnifiedEvent, data []byte
 }
 
 // parseK8sData parses Kubernetes collector data
-func (t *EventTransformer) parseK8sData(event *domain.UnifiedEvent, data []byte) {
+func (t *EventTransformer) parseKubeAPIData(event *domain.UnifiedEvent, data []byte) {
 	event.Kubernetes = &domain.KubernetesData{}
 
 	var jsonData map[string]interface{}
@@ -352,7 +352,7 @@ func mapCollectorType(collectorType string) domain.EventType {
 		return domain.EventTypeLog
 	case "ebpf":
 		return domain.EventTypeSystem
-	case "k8s":
+	case "kubeapi":
 		return domain.EventTypeKubernetes
 	case "etcd":
 		return domain.EventTypeSystem
@@ -370,7 +370,7 @@ func getCategoryFromType(collectorType string) string {
 		return "system"
 	case "ebpf":
 		return "kernel"
-	case "k8s":
+	case "kubeapi":
 		return "orchestration"
 	case "etcd":
 		return "storage"

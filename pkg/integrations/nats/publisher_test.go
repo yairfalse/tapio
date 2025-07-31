@@ -89,9 +89,9 @@ func TestEventPublisher_PublishRawEvent(t *testing.T) {
 			want: ".raw.systemd", // will be prefixed in test
 		},
 		{
-			name: "k8s event with namespace",
+			name: "kubeapi event with namespace",
 			event: collectors.RawEvent{
-				Type:      "k8s",
+				Type:      "kubeapi",
 				Timestamp: time.Now(),
 				Data:      []byte(`{"type": "Warning"}`),
 				Metadata: map[string]string{
@@ -99,7 +99,7 @@ func TestEventPublisher_PublishRawEvent(t *testing.T) {
 					"trace_id":  "trace-456",
 				},
 			},
-			want: ".raw.k8s.production", // will be prefixed in test
+			want: ".raw.kubeapi.production", // will be prefixed in test
 		},
 		{
 			name: "critical event",

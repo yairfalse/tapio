@@ -330,8 +330,8 @@ func (p *EventPublisher) generateRawEventSubject(event collectors.RawEvent) stri
 
 	parts := []string{prefix, "raw", event.Type}
 
-	// Add namespace for k8s events
-	if event.Type == "k8s" && event.Metadata["namespace"] != "" {
+	// Add namespace for kubeapi events
+	if event.Type == "kubeapi" && event.Metadata["namespace"] != "" {
 		parts = append(parts, event.Metadata["namespace"])
 	}
 

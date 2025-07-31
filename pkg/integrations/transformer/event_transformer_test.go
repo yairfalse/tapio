@@ -58,7 +58,7 @@ func TestEventTransformer_Transform(t *testing.T) {
 		{
 			name: "k8s pod OOM event",
 			input: collectors.RawEvent{
-				Type:      "k8s",
+				Type:      "kubeapi",
 				Timestamp: time.Now(),
 				Data: []byte(`{
 					"type": "Warning",
@@ -77,7 +77,7 @@ func TestEventTransformer_Transform(t *testing.T) {
 			},
 			validate: func(t *testing.T, event *domain.UnifiedEvent) {
 				assert.Equal(t, domain.EventTypeKubernetes, event.Type)
-				assert.Equal(t, "k8s", event.Source)
+				assert.Equal(t, "kubeapi", event.Source)
 				assert.Equal(t, "orchestration", event.Category)
 				assert.Equal(t, domain.EventSeverityCritical, event.Severity) // OOM is critical
 
@@ -198,7 +198,7 @@ func TestEventTransformer_Transform(t *testing.T) {
 		{
 			name: "event with parent span",
 			input: collectors.RawEvent{
-				Type:      "k8s",
+				Type:      "kubeapi",
 				Timestamp: time.Now(),
 				Data:      []byte(`{"type": "Normal", "reason": "Created"}`),
 				Metadata: map[string]string{
@@ -217,7 +217,7 @@ func TestEventTransformer_Transform(t *testing.T) {
 		{
 			name: "malformed JSON data",
 			input: collectors.RawEvent{
-				Type:      "k8s",
+				Type:      "kubeapi",
 				Timestamp: time.Now(),
 				Data:      []byte(`{"invalid": json`),
 				Metadata:  map[string]string{},
@@ -436,7 +436,7 @@ func BenchmarkEventTransformer_Transform(b *testing.B) {
 	transformer := NewEventTransformer()
 
 	event := collectors.RawEvent{
-		Type:      "k8s",
+		Type:      "kubeapi",
 		Timestamp: time.Now(),
 		Data: []byte(`{
 			"type": "Warning",
