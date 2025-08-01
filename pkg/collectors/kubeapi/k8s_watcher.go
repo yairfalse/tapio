@@ -1,9 +1,10 @@
-package k8s
+package kubeapi
 
 import (
 	"fmt"
 	"time"
 
+	"github.com/yairfalse/tapio/pkg/collectors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -50,6 +51,7 @@ func (c *Collector) startK8sWatch() error {
 
 	// Set up watchers for core resources
 	resources := []schema.GroupVersionResource{
+		{Group: "", Version: "v1", Resource: "namespaces"},
 		{Group: "", Version: "v1", Resource: "pods"},
 		{Group: "", Version: "v1", Resource: "services"},
 		{Group: "", Version: "v1", Resource: "nodes"},
@@ -101,6 +103,10 @@ func (c *Collector) handleK8sEvent(eventType, resourceType string, obj interface
 		return
 	}
 
+	// Extract trace IDs from annotations if available
+	annotations := unstructuredObj.GetAnnotations()
+	traceID, spanID := collectors.ExtractTraceIDFromAnnotations(annotations)
+
 	// Create raw event with just the data - NO enrichment or correlation
 	eventData := map[string]interface{}{
 		"api_version": unstructuredObj.GetAPIVersion(),
@@ -113,7 +119,7 @@ func (c *Collector) handleK8sEvent(eventType, resourceType string, obj interface
 		"object":      unstructuredObj.Object, // Raw K8s object
 	}
 
-	rawEvent := c.createEvent("api_event", eventData)
+	rawEvent := c.createEvent("api_event", eventData, traceID, spanID)
 
 	select {
 	case c.events <- rawEvent:
