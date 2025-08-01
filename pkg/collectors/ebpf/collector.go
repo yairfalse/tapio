@@ -35,6 +35,14 @@ type PodInfo struct {
 	CreatedAt uint64
 }
 
+// ContainerInfo represents container information for PID correlation
+type ContainerInfo struct {
+	ContainerID [64]byte  // Docker/containerd ID
+	PodUID      [36]byte  // Associated pod
+	Image       [128]byte // Container image
+	StartedAt   uint64    // Container start time
+}
+
 // Collector implements minimal kernel monitoring via eBPF
 type Collector struct {
 	name        string
@@ -227,20 +235,29 @@ func (c *Collector) processEvents() {
 		}
 		event = *(*KernelEvent)(unsafe.Pointer(&record.RawSample[0]))
 
-		// Convert to RawEvent - NO BUSINESS LOGIC, just add pod correlation
+		// Convert to RawEvent - NO BUSINESS LOGIC, just add correlation metadata
+		metadata := map[string]string{
+			"collector": "ebpf",
+			"pid":       fmt.Sprintf("%d", event.PID),
+			"tid":       fmt.Sprintf("%d", event.TID),
+			"comm":      c.nullTerminatedString(event.Comm[:]),
+			"size":      fmt.Sprintf("%d", event.Size),
+			"cgroup_id": fmt.Sprintf("%d", event.CgroupID),
+			"pod_uid":   c.nullTerminatedString(event.PodUID[:]),
+		}
+
+		// Add container information if available
+		if containerInfo, err := c.GetContainerInfo(event.PID); err == nil {
+			metadata["container_id"] = c.nullTerminatedString(containerInfo.ContainerID[:])
+			metadata["container_image"] = c.nullTerminatedString(containerInfo.Image[:])
+			metadata["container_started_at"] = fmt.Sprintf("%d", containerInfo.StartedAt)
+		}
+
 		rawEvent := collectors.RawEvent{
 			Timestamp: time.Unix(0, int64(event.Timestamp)),
 			Type:      c.eventTypeToString(event.EventType),
 			Data:      record.RawSample, // Raw eBPF event data
-			Metadata: map[string]string{
-				"collector": "ebpf",
-				"pid":       fmt.Sprintf("%d", event.PID),
-				"tid":       fmt.Sprintf("%d", event.TID),
-				"comm":      c.nullTerminatedString(event.Comm[:]),
-				"size":      fmt.Sprintf("%d", event.Size),
-				"cgroup_id": fmt.Sprintf("%d", event.CgroupID),
-				"pod_uid":   c.nullTerminatedString(event.PodUID[:]),
-			},
+			Metadata:  metadata,
 			// Generate new trace for kernel events, or reuse pod trace if available
 			TraceID: c.getOrGenerateTraceID(event),
 			SpanID:  collectors.GenerateSpanID(),
@@ -327,6 +344,49 @@ func (c *Collector) GetPodInfo(cgroupID uint64) (*PodInfo, error) {
 	return &podInfo, nil
 }
 
+// UpdateContainerInfo updates container information in the eBPF map for PID correlation
+func (c *Collector) UpdateContainerInfo(pid uint32, containerID, podUID, image string) error {
+	if c.objs == nil || c.objs.ContainerInfoMap == nil {
+		return fmt.Errorf("eBPF maps not initialized")
+	}
+
+	containerInfo := &ContainerInfo{
+		StartedAt: uint64(time.Now().Unix()),
+	}
+
+	// Copy strings with proper bounds checking
+	copy(containerInfo.ContainerID[:], containerID)
+	copy(containerInfo.PodUID[:], podUID)
+	copy(containerInfo.Image[:], image)
+
+	// Update the eBPF map
+	return c.objs.ContainerInfoMap.Put(pid, containerInfo)
+}
+
+// RemoveContainerInfo removes container information from the eBPF map
+func (c *Collector) RemoveContainerInfo(pid uint32) error {
+	if c.objs == nil || c.objs.ContainerInfoMap == nil {
+		return fmt.Errorf("eBPF maps not initialized")
+	}
+
+	return c.objs.ContainerInfoMap.Delete(pid)
+}
+
+// GetContainerInfo retrieves container information for a given PID
+func (c *Collector) GetContainerInfo(pid uint32) (*ContainerInfo, error) {
+	if c.objs == nil || c.objs.ContainerInfoMap == nil {
+		return nil, fmt.Errorf("eBPF maps not initialized")
+	}
+
+	var containerInfo ContainerInfo
+	err := c.objs.ContainerInfoMap.Lookup(pid, &containerInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	return &containerInfo, nil
+}
+
 // getOrGenerateTraceID returns an existing trace ID for a pod or generates a new one
 func (c *Collector) getOrGenerateTraceID(event KernelEvent) string {
 	// If we have a pod UID, use it to maintain consistent trace ID per pod
@@ -341,7 +401,7 @@ func (c *Collector) getOrGenerateTraceID(event KernelEvent) string {
 		c.podTraceMap[podUID] = traceID
 		return traceID
 	}
-	
+
 	// For non-pod events, generate a new trace ID each time
 	return collectors.GenerateTraceID()
 }

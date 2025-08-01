@@ -34,6 +34,14 @@ struct pod_info {
     __u64 created_at;
 } __attribute__((packed));
 
+// Container information structure for PID correlation
+struct container_info {
+    char container_id[64];  // Docker/containerd ID
+    char pod_uid[36];       // Associated pod
+    char image[128];        // Container image
+    __u64 started_at;       // Container start time
+} __attribute__((packed));
+
 // Maps
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
@@ -55,6 +63,14 @@ struct {
     __type(value, struct pod_info); // pod info
 } pod_info_map SEC(".maps");
 
+// Map PID to container information
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 20480);
+    __type(key, __u32);             // PID
+    __type(value, struct container_info); // container info
+} container_info_map SEC(".maps");
+
 // Helper to check if process is in a container
 static __always_inline bool is_container_process(__u32 pid)
 {
@@ -75,6 +91,12 @@ static __always_inline __u64 get_cgroup_id(struct task_struct *task)
 static __always_inline struct pod_info *get_pod_info(__u64 cgroup_id)
 {
     return bpf_map_lookup_elem(&pod_info_map, &cgroup_id);
+}
+
+// Helper to get container information for a PID
+static __always_inline struct container_info *get_container_info(__u32 pid)
+{
+    return bpf_map_lookup_elem(&container_info_map, &pid);
 }
 
 // Memory allocation tracing - using generic tracepoint
