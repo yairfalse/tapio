@@ -101,7 +101,7 @@ func TestContainerInfoBounds(t *testing.T) {
 
 	// Copy truncates, so extracted strings should fit in buffers minus null terminator
 	assert.LessOrEqual(t, len(containerID), 64) // Full buffer can be used
-	assert.LessOrEqual(t, len(podUID), 36)      // Full buffer can be used  
+	assert.LessOrEqual(t, len(podUID), 36)      // Full buffer can be used
 	assert.LessOrEqual(t, len(image), 128)      // Full buffer can be used
 
 	// Verify they start with expected prefixes
