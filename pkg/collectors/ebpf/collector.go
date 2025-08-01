@@ -758,7 +758,7 @@ func (c *Collector) convertToUnifiedEvent(raw *collectors.RawEvent, kernelEvent 
 	}
 	
 	// Add K8s context if we have pod info
-	if podUID := c.nullTerminatedString(kernelEvent.PodUID[:]); podUID \!= "" {
+	if podUID := c.nullTerminatedString(kernelEvent.PodUID[:]); podUID != "" {
 		event.K8sContext = &domain.K8sContext{}
 		if podInfo, err := c.GetPodInfo(kernelEvent.CgroupID); err == nil {
 			event.K8sContext.Name = c.nullTerminatedString(podInfo.PodName[:])
@@ -767,7 +767,7 @@ func (c *Collector) convertToUnifiedEvent(raw *collectors.RawEvent, kernelEvent 
 	}
 	
 	// Add entity context
-	if event.K8sContext \!= nil && event.K8sContext.Name \!= "" {
+	if event.K8sContext != nil && event.K8sContext.Name != "" {
 		event.Entity = &domain.EntityContext{
 			Type:      "pod",
 			Name:      event.K8sContext.Name,
