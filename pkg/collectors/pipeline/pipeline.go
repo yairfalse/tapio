@@ -114,12 +114,15 @@ func (p *EventPipeline) Stop() error {
 
 // consumeCollector reads events from a collector and forwards to processing
 func (p *EventPipeline) consumeCollector(name string, collector collectors.Collector) {
+	fmt.Printf("Started consuming from collector: %s\n", name)
 	for {
 		select {
 		case event, ok := <-collector.Events():
 			if !ok {
+				fmt.Printf("Collector %s channel closed\n", name)
 				return
 			}
+			fmt.Printf("Received event from %s: Type=%s, TraceID=%s\n", name, event.Type, event.TraceID)
 			// Add collector name to metadata
 			if event.Metadata == nil {
 				event.Metadata = make(map[string]string)
@@ -128,6 +131,7 @@ func (p *EventPipeline) consumeCollector(name string, collector collectors.Colle
 
 			select {
 			case p.eventsChan <- &event:
+				fmt.Printf("Event forwarded to pipeline\n")
 			case <-p.ctx.Done():
 				return
 			}
@@ -150,10 +154,15 @@ func (p *EventPipeline) worker(wg *sync.WaitGroup) {
 
 		// Publish to NATS
 		if p.publisher != nil {
+			fmt.Printf("Publishing event to NATS: ID=%s, Type=%s, Source=%s\n", unified.ID, unified.Type, unified.Source)
 			if err := p.publisher.Publish(unified); err != nil {
 				// Log error but continue
 				fmt.Printf("Failed to publish event: %v\n", err)
+			} else {
+				fmt.Printf("Successfully published event %s to NATS\n", unified.ID)
 			}
+		} else {
+			fmt.Printf("WARNING: NATS publisher is nil, event dropped\n")
 		}
 	}
 }
