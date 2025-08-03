@@ -66,14 +66,14 @@ func (c *Client) CreateOrUpdateNode(ctx context.Context, event *domain.UnifiedEv
 		"namespace":       event.Entity.Namespace,
 		"kind":            event.Entity.Type,
 		"timestamp":       event.Timestamp.Unix(),
-		"labels":          event.Entity.Labels,
-		"annotations":     map[string]string{}, // EntityContext doesn't have annotations
-		"resourceVersion": "",                  // EntityContext doesn't have resourceVersion
+		"labels":          mapToStringArray(event.Entity.Labels),
+		"annotations":     []string{}, // EntityContext doesn't have annotations
+		"resourceVersion": "",         // EntityContext doesn't have resourceVersion
 	}
 
 	// If we have K8s context, use those values
 	if event.K8sContext != nil {
-		params["annotations"] = event.K8sContext.Annotations
+		params["annotations"] = mapToStringArray(event.K8sContext.Annotations)
 		params["resourceVersion"] = event.K8sContext.ResourceVersion
 	}
 
@@ -216,4 +216,18 @@ func getNodeType(entityType string) NodeType {
 	default:
 		return NodeType(entityType)
 	}
+}
+
+// mapToStringArray converts a map[string]string to an array of "key=value" strings
+// Neo4j doesn't accept Go maps directly, so we convert to string arrays
+func mapToStringArray(m map[string]string) []string {
+	if m == nil {
+		return []string{}
+	}
+
+	result := make([]string, 0, len(m))
+	for key, value := range m {
+		result = append(result, fmt.Sprintf("%s=%s", key, value))
+	}
+	return result
 }
