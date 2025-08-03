@@ -4,10 +4,10 @@ package systemd
 type Config struct {
 	// Buffer size for events channel
 	BufferSize int
-	
+
 	// Enable eBPF monitoring
 	EnableEBPF bool
-	
+
 	// Service patterns to monitor (empty = all)
 	ServicePatterns []string
 }
