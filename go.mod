@@ -4,6 +4,7 @@ go 1.24.3
 
 require (
 	github.com/cilium/ebpf v0.12.3
+	github.com/gorilla/mux v1.8.1
 	github.com/nats-io/nats-server/v2 v2.11.6
 	github.com/nats-io/nats.go v1.44.0
 	github.com/neo4j/neo4j-go-driver/v5 v5.28.1
