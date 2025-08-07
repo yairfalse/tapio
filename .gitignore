@@ -42,6 +42,7 @@ dist/
 *~
 .vscode/
 *.iml
+.claude/
 
 # OS specific files
 .DS_Store
