@@ -1,0 +1,240 @@
+# Collectors Makefile - Build collectors independently
+# This can be included in the main Makefile or used standalone
+
+.PHONY: help
+help: ## Show this help
+	@echo "Collectors Build System"
+	@echo "======================"
+	@echo ""
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+
+# Variables
+GO := go
+GOFLAGS := -v
+BUILD_FLAGS := -trimpath
+TEST_FLAGS := -race -cover
+
+# BPF build variables
+CLANG := clang
+BPF2GO := go run github.com/cilium/ebpf/cmd/bpf2go
+BPF_HEADERS := pkg/collectors/bpf_common
+BPF_TARGET := amd64,arm64
+
+# All collectors
+COLLECTORS := dns ebpf etcd kubelet kubeapi systemd cni
+BPF_COLLECTORS := dns ebpf etcd cni systemd kubelet
+
+##@ Build Commands
+
+.PHONY: collectors
+collectors: ## Build all collectors
+	@echo "Building all collectors..."
+	@for collector in $(COLLECTORS); do \
+		echo "Building $$collector..."; \
+		$(MAKE) collector-$$collector || exit 1; \
+	done
+	@echo "✅ All collectors built successfully"
+
+.PHONY: collectors-test
+collectors-test: ## Test all collectors
+	@echo "Testing all collectors..."
+	@for collector in $(COLLECTORS); do \
+		echo "Testing $$collector..."; \
+		$(MAKE) test-$$collector || exit 1; \
+	done
+	@echo "✅ All collectors tested successfully"
+
+.PHONY: collectors-generate
+collectors-generate: ## Generate BPF code for all BPF collectors
+	@echo "Generating BPF code..."
+	@for collector in $(BPF_COLLECTORS); do \
+		echo "Generating BPF for $$collector..."; \
+		$(MAKE) generate-$$collector || exit 1; \
+	done
+	@echo "✅ All BPF code generated successfully"
+
+.PHONY: collectors-clean
+collectors-clean: ## Clean all generated files
+	@echo "Cleaning generated files..."
+	@find pkg/collectors -name "*_bpfel_*.go" -delete
+	@find pkg/collectors -name "*_bpfel_*.o" -delete
+	@echo "✅ Cleaned"
+
+##@ Individual Collector Targets
+
+# DNS Collector
+.PHONY: collector-dns
+collector-dns: generate-dns ## Build DNS collector
+	@echo "Building DNS collector..."
+	@cd pkg/collectors/dns && $(GO) build $(GOFLAGS) $(BUILD_FLAGS) ./...
+
+.PHONY: test-dns
+test-dns: ## Test DNS collector
+	@echo "Testing DNS collector..."
+	@cd pkg/collectors/dns && $(GO) test $(TEST_FLAGS) ./...
+
+.PHONY: generate-dns
+generate-dns: ## Generate DNS BPF code
+	@echo "Generating DNS BPF code..."
+	@cd pkg/collectors/dns && $(GO) generate ./...
+
+# eBPF Collector
+.PHONY: collector-ebpf
+collector-ebpf: generate-ebpf ## Build eBPF collector
+	@echo "Building eBPF collector..."
+	@cd pkg/collectors/ebpf && $(GO) build $(GOFLAGS) $(BUILD_FLAGS) ./...
+
+.PHONY: test-ebpf
+test-ebpf: ## Test eBPF collector
+	@echo "Testing eBPF collector..."
+	@cd pkg/collectors/ebpf && $(GO) test $(TEST_FLAGS) ./...
+
+.PHONY: generate-ebpf
+generate-ebpf: ## Generate eBPF BPF code
+	@echo "Generating eBPF BPF code..."
+	@cd pkg/collectors/ebpf && $(GO) generate ./...
+
+# etcd Collector
+.PHONY: collector-etcd
+collector-etcd: generate-etcd ## Build etcd collector
+	@echo "Building etcd collector..."
+	@cd pkg/collectors/etcd && $(GO) build $(GOFLAGS) $(BUILD_FLAGS) ./...
+
+.PHONY: test-etcd
+test-etcd: ## Test etcd collector
+	@echo "Testing etcd collector..."
+	@cd pkg/collectors/etcd && $(GO) test $(TEST_FLAGS) ./...
+
+.PHONY: generate-etcd
+generate-etcd: ## Generate etcd BPF code
+	@echo "Generating etcd BPF code..."
+	@cd pkg/collectors/etcd && $(GO) generate ./...
+
+# Kubelet Collector
+.PHONY: collector-kubelet
+collector-kubelet: generate-kubelet ## Build kubelet collector
+	@echo "Building kubelet collector..."
+	@cd pkg/collectors/kubelet && $(GO) build $(GOFLAGS) $(BUILD_FLAGS) ./...
+
+.PHONY: test-kubelet
+test-kubelet: ## Test kubelet collector
+	@echo "Testing kubelet collector..."
+	@cd pkg/collectors/kubelet && $(GO) test $(TEST_FLAGS) ./...
+
+.PHONY: generate-kubelet
+generate-kubelet: ## Generate kubelet BPF code
+	@echo "Generating kubelet BPF code..."
+	@cd pkg/collectors/kubelet && $(GO) generate ./...
+
+# KubeAPI Collector
+.PHONY: collector-kubeapi
+collector-kubeapi: ## Build kubeapi collector
+	@echo "Building kubeapi collector..."
+	@cd pkg/collectors/kubeapi && $(GO) build $(GOFLAGS) $(BUILD_FLAGS) ./...
+
+.PHONY: test-kubeapi
+test-kubeapi: ## Test kubeapi collector
+	@echo "Testing kubeapi collector..."
+	@cd pkg/collectors/kubeapi && $(GO) test $(TEST_FLAGS) ./...
+
+# Systemd Collector
+.PHONY: collector-systemd
+collector-systemd: generate-systemd ## Build systemd collector
+	@echo "Building systemd collector..."
+	@cd pkg/collectors/systemd && $(GO) build $(GOFLAGS) $(BUILD_FLAGS) ./...
+
+.PHONY: test-systemd
+test-systemd: ## Test systemd collector
+	@echo "Testing systemd collector..."
+	@cd pkg/collectors/systemd && $(GO) test $(TEST_FLAGS) ./...
+
+.PHONY: generate-systemd
+generate-systemd: ## Generate systemd BPF code
+	@echo "Generating systemd BPF code..."
+	@cd pkg/collectors/systemd && $(GO) generate ./...
+
+# CNI Collector
+.PHONY: collector-cni
+collector-cni: generate-cni ## Build CNI collector
+	@echo "Building CNI collector..."
+	@cd pkg/collectors/cni && $(GO) build $(GOFLAGS) $(BUILD_FLAGS) ./...
+
+.PHONY: test-cni
+test-cni: ## Test CNI collector
+	@echo "Testing CNI collector..."
+	@cd pkg/collectors/cni && $(GO) test $(TEST_FLAGS) ./...
+
+.PHONY: generate-cni
+generate-cni: ## Generate CNI BPF code
+	@echo "Generating CNI BPF code..."
+	@cd pkg/collectors/cni && $(GO) generate ./...
+
+##@ Verification Commands
+
+.PHONY: verify-build
+verify-build: ## Verify all collectors build independently
+	@echo "Verifying independent builds..."
+	@for collector in $(COLLECTORS); do \
+		echo -n "  $$collector: "; \
+		cd pkg/collectors/$$collector && \
+		if $(GO) build ./... > /dev/null 2>&1; then \
+			echo "✅"; \
+		else \
+			echo "❌"; \
+			exit 1; \
+		fi; \
+		cd - > /dev/null; \
+	done
+	@echo "✅ All collectors build independently"
+
+.PHONY: verify-deps
+verify-deps: ## Check for dependency violations
+	@echo "Checking dependencies..."
+	@violations=0; \
+	for dir in pkg/collectors/*/; do \
+		name=$$(basename $$dir); \
+		if grep -r "pkg/intelligence\|pkg/interfaces\|pkg/integrations" $$dir --include="*.go" > /dev/null 2>&1; then \
+			echo "❌ $$name has invalid dependencies"; \
+			violations=$$((violations + 1)); \
+		fi; \
+	done; \
+	if [ $$violations -eq 0 ]; then \
+		echo "✅ No dependency violations found"; \
+	else \
+		echo "❌ Found $$violations dependency violations"; \
+		exit 1; \
+	fi
+
+.PHONY: list-todos
+list-todos: ## List all TODOs in collectors
+	@echo "TODOs in collectors:"
+	@grep -r "TODO" pkg/collectors --include="*.go" | grep -v "context.TODO" | wc -l | xargs echo "  Non-context TODOs:"
+	@grep -r "context.TODO" pkg/collectors --include="*.go" | wc -l | xargs echo "  context.TODO instances:"
+
+##@ Quality Commands
+
+.PHONY: fmt
+fmt: ## Format all collector code
+	@echo "Formatting collectors..."
+	@$(GO) fmt ./pkg/collectors/...
+	@echo "✅ Formatted"
+
+.PHONY: lint
+lint: ## Lint all collectors
+	@echo "Linting collectors..."
+	@if command -v golangci-lint > /dev/null; then \
+		golangci-lint run ./pkg/collectors/...; \
+	else \
+		echo "golangci-lint not installed, using go vet"; \
+		$(GO) vet ./pkg/collectors/...; \
+	fi
+
+.PHONY: coverage
+coverage: ## Generate coverage report for all collectors
+	@echo "Generating coverage report..."
+	@$(GO) test -coverprofile=coverage.out ./pkg/collectors/...
+	@$(GO) tool cover -html=coverage.out -o coverage.html
+	@echo "✅ Coverage report generated: coverage.html"
+
+# Include in main Makefile with:
+# include Makefile.collectors
