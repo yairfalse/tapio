@@ -12,6 +12,7 @@ import (
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/yairfalse/tapio/pkg/collectors"
+	"github.com/yairfalse/tapio/pkg/collectors/ebpf/bpf"
 	"github.com/yairfalse/tapio/pkg/domain"
 	"go.uber.org/zap"
 )
@@ -19,7 +20,7 @@ import (
 // Collector implements minimal kernel monitoring via eBPF
 type Collector struct {
 	name          string
-	objs          *kernelMonitorObjects
+	objs          *bpf.KernelMonitorObjects
 	links         []link.Link
 	reader        *ringbuf.Reader
 	events        chan collectors.RawEvent
@@ -76,14 +77,9 @@ func (c *Collector) Start(ctx context.Context) error {
 	c.ctx, c.cancel = context.WithCancel(ctx)
 
 	// Load eBPF program
-	spec, err := loadKernelMonitor()
+	err := bpf.LoadKernelMonitorObjects(c.objs, nil)
 	if err != nil {
 		return fmt.Errorf("failed to load eBPF spec: %w", err)
-	}
-
-	c.objs = &kernelMonitorObjects{}
-	if err := spec.LoadAndAssign(c.objs, nil); err != nil {
-		return fmt.Errorf("failed to load eBPF objects: %w", err)
 	}
 
 	// Populate container PIDs

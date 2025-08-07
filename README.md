@@ -1,190 +1,162 @@
-# Tapio: Modular Kubernetes Observability
+# Tapio
 
-<div align="center">
+A correlation engine for Kubernetes observability that actually finds root causes.
 
-![Status](https://img.shields.io/badge/Status-Early%20Development-orange?style=for-the-badge)
+## What is Tapio?
 
-**A modular observability platform exploring intelligent correlation of Kubernetes events**
+Tapio watches your Kubernetes cluster and automatically correlates events to identify why things break. Instead of drowning in logs and metrics, you get clear answers about what went wrong and why.
 
-[![Go Version](https://img.shields.io/badge/Go-1.24-blue.svg)](https://golang.org)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-
-[What We're Building](#-what-were-building) • [Current Status](#-current-status) • [Architecture](#-architecture) • [Contributing](#-contributing)
-
-</div>
-
-## 🎯 What We're Building
-
-Tapio is an **experimental** platform for Kubernetes observability that attempts to correlate events across different infrastructure layers. We're exploring whether we can:
-
-- Connect related events (pod failures → node issues → network problems)
-- Detect common failure patterns automatically  
-- Store event relationships in a graph database
-- Answer "why did this fail?" questions
-
-**This is early-stage research.** We make no promises about production readiness, performance, or reliability.
-
-## 📍 Current Status
-
-**What actually works today:**
-
-✅ **Event Collection**: Multiple collectors (K8s API, eBPF, etcd, systemd, CNI)  
-✅ **Event Pipeline**: NATS-based event streaming with correlation IDs  
-✅ **Intelligence Engine**: Neo4j-based pattern detection with 6 basic patterns  
-✅ **Graph Storage**: Stores K8s relationships and events in Neo4j  
-✅ **Pattern Detection**: Basic failure pattern recognition (OOM kills, crash loops, etc.)  
-✅ **Modular Architecture**: Clean separation between collectors, intelligence, and integrations  
-
-**What we're experimenting with:**
-
-🔬 **Semantic Correlation**: Attempting to automatically link related events  
-🔬 **Root Cause Analysis**: Exploring graph-based "why did this fail" queries  
-🔬 **Pattern Library**: Building detection for common K8s failure scenarios  
-
-**What doesn't exist yet:**
-
-❌ Production deployment guides  
-❌ Performance guarantees  
-❌ Backward compatibility promises  
-❌ Enterprise features  
-❌ SLA or support  
-
-## 🏗️ Architecture
-
-Tapio follows a 5-level modular architecture:
+## How It Works
 
 ```
-Level 0: pkg/domain/          # Core data structures (UnifiedEvent, etc.)
-Level 1: pkg/collectors/      # Data collection (K8s, eBPF, etcd, CNI, systemd)
-Level 2: pkg/intelligence/    # Pattern detection and correlation
-Level 3: pkg/integrations/    # External system connectors
-Level 4: pkg/interfaces/      # APIs and user interfaces
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  Kubernetes │     │    System   │     │   Network   │
+│   Cluster   │     │  (eBPF/sys) │     │  (DNS/CNI)  │
+└──────┬──────┘     └──────┬──────┘     └──────┬──────┘
+       │                   │                    │
+       │ events            │ events             │ events
+       ▼                   ▼                    ▼
+┌─────────────────────────────────────────────────────┐
+│                     Collectors                      │
+│  (kubeapi, kubelet, ebpf, systemd, etcd, cni, dns) │
+└─────────────────────────┬───────────────────────────┘
+                          │
+                          │ raw events
+                          ▼
+                    ┌───────────┐
+                    │   NATS    │
+                    │  Message  │
+                    │    Bus    │
+                    └─────┬─────┘
+                          │
+                          │ unified events
+                          ▼
+                ┌───────────────────┐
+                │   Correlation     │
+                │     Engine        │
+                └─────────┬─────────┘
+                          │
+                          │ correlations
+                          ▼
+                ┌───────────────────┐
+                │    Analysis       │
+                │     Engine        │
+                │   "Smart Brain"   │
+                └─────────┬─────────┘
+                          │
+                          │ insights
+                          ▼
+                ┌───────────────────┐
+                │    Root Cause     │
+                │   + What To Do    │
+                └───────────────────┘
 ```
 
-### Core Components
+## Core Components
 
-- **UnifiedEvent**: Standard event format with K8s context and trace correlation
-- **Collectors**: Modular event collection from different sources
-- **Intelligence Engine**: Neo4j-based correlation and pattern detection
-- **Event Pipeline**: NATS streaming for event distribution
+### Collectors (Level 1)
+- **kubeapi**: Kubernetes API events and resource changes
+- **kubelet**: Node-level metrics and pod lifecycle events
+- **ebpf**: Kernel-level system calls and network events  
+- **etcd**: Cluster state changes and configuration updates
+- **systemd**: Service logs and system events
+- **cni**: Container networking events and connectivity
+- **dns**: DNS queries and resolution patterns
 
-[Detailed Architecture →](docs/ARCHITECTURE.md)
+### Intelligence Layer (Level 2)
+- **Correlation Engine**: Finds relationships between events
+  - Temporal correlation (events happening together)
+  - Kubernetes ownership chains
+  - Service dependency mapping
+  - Network communication patterns
+  
+- **Analysis Engine**: The "Smart Brain" that produces insights
+  - Aggregates correlations from multiple sources
+  - Scores confidence based on evidence strength
+  - Detects patterns (cascading failures, periodic issues)
+  - Generates human-readable recommendations
 
-## 🚀 Quick Start
+### Architecture Principles
 
-**Prerequisites**: Go 1.24+, Minikube, Neo4j
+We follow a strict 5-level hierarchy:
+```
+Level 0: domain/       # Core types, zero dependencies
+Level 1: collectors/   # Data collection, domain only  
+Level 2: intelligence/ # Correlation & analysis
+Level 3: integrations/ # External systems
+Level 4: interfaces/   # APIs and UIs
+```
+
+Each level can only import from lower levels. No exceptions.
+
+## Getting Started
 
 ```bash
-# Clone and build
-git clone https://github.com/yairfalse/tapio.git
-cd tapio
-go build ./...
+# Build the services
+make build
 
-# Start Neo4j (using provided manifests)
-kubectl apply -f k8s/neo4j.yaml
+# Run correlation service
+./bin/correlation-service
 
-# Run intelligence demo
-go run cmd/intelligence-demo/main.go
+# Run Tapio CLI
+./bin/tapio --config config/tapio.yaml
 ```
 
-### Individual Collectors
+## Configuration
 
-```bash
-# K8s events collector
-go run cmd/collectors/kubeapi/main.go
-
-# eBPF kernel events (requires root)
-sudo go run cmd/collectors/ebpf/main.go
-
-# systemd service events
-go run cmd/collectors/systemd/main.go
+```yaml
+# config/tapio.yaml
+collectors:
+  enabled:
+    - kubeapi
+    - kubelet
+    - ebpf
+    - etcd
+    - systemd
+    - cni
+    - dns
+  buffer_size: 2000
+  
+pipeline:
+  endpoint: "localhost:50051"
 ```
 
-## 🧪 Intelligence Engine Demo
+## How It Works
 
-The intelligence engine can detect basic failure patterns:
+1. **Collectors** gather raw events from every layer of your infrastructure
+2. **Pipeline** (NATS) transports and buffers events reliably
+3. **Correlation Engine** finds relationships between seemingly unrelated events
+4. **Analysis Engine** turns technical correlations into actionable insights
 
-```bash
-$ go run cmd/intelligence-demo/main.go
+Example: When a pod crashes, Tapio doesn't just tell you it crashed - it tells you:
+- The ConfigMap change 5 minutes ago triggered it
+- Which resulted in a connection pool exhaustion
+- That caused memory pressure
+- Leading to the OOM kill
 
-🧠 Tapio Intelligence Engine Test Drive
-=====================================
-
-1️⃣ Connecting to Neo4j...
-✅ Connected and indexes created!
-
-2️⃣ Scenario: Memory pressure causing OOM kills
-💥 OOM Kill event for web-app-pod-1
-
-🔍 Querying: Why did web-app-pod-1 fail?
-📊 Root Cause Analysis: [Shows detected patterns]
-
-✅ Test drive complete!
-```
-
-The demo creates synthetic scenarios and shows pattern detection working.
-
-## 🔧 Development
-
-### Building
+## Development
 
 ```bash
 # Format code (required)
-gofmt -w .
+make fmt
 
-# Build all modules
-go build ./...
+# Run tests
+make test
 
-# Test individual modules
-go test ./pkg/intelligence/...
-go test ./pkg/collectors/...
+# Build everything
+make build
 ```
 
-### Module Structure
+## Status
 
-Each module builds independently:
-```bash
-cd pkg/collectors && go build ./...
-cd pkg/intelligence && go build ./...
-cd pkg/integrations && go build ./...
-```
+This is an active research project exploring semantic correlation in observability. We're building real implementations, not prototypes.
 
-## 🤝 Contributing
-
-We welcome experiments and improvements! See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-**Good first contributions:**
-- Add new failure patterns to `pkg/intelligence/patterns/`
-- Improve collector reliability
-- Add integration tests
-- Document failure scenarios
-
-## ⚠️ Important Notes
-
-- **Early Development**: APIs will change, data formats may break
-- **Experimental**: We're exploring what's possible, not shipping a product
-- **No Warranties**: Use at your own risk in non-production environments
-- **Research Focus**: We prioritize learning over stability
-
-## 📖 Documentation
-
-| Document | Description |
-|----------|-------------|
-| [Architecture](docs/ARCHITECTURE.md) | Modular system design |
-| [UnifiedEvent](docs/UNIFIED_EVENT_DESIGN.md) | Core event format |
-| [Intelligence](docs/INTELLIGENCE.md) | Pattern detection approach |
-| [Collectors](docs/COLLECTORS.md) | Building data collectors |
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) for details.
+Core components working:
+- ✅ Multi-layer event collection (K8s, eBPF, network, system)
+- ✅ Correlation engine with pattern detection
+- ✅ Analysis engine with confidence scoring
+- ✅ NATS-based event pipeline
 
 ---
 
-<div align="center">
-
-**An experiment in infrastructure observability**
-
-[Repository](https://github.com/yairfalse/tapio) • [Issues](https://github.com/yairfalse/tapio/issues)
-
-</div>
+Built with discipline. No stubs, no shortcuts, no excuses.

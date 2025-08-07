@@ -12,6 +12,7 @@ import (
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
+	"github.com/yairfalse/tapio/pkg/collectors/etcd/bpf"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target amd64,arm64 -cc clang etcdMonitor ./bpf/etcd_monitor.c -- -I./bpf/headers -D__TARGET_ARCH_x86
@@ -33,7 +34,7 @@ type etcdEvent struct {
 
 // eBPF components
 type ebpfState struct {
-	objs   *etcdMonitorObjects
+	objs   *bpf.EtcdMonitorObjects
 	links  []link.Link
 	reader *ringbuf.Reader
 }
@@ -46,8 +47,8 @@ func (c *Collector) startEBPF() error {
 	}
 
 	// Load eBPF objects
-	objs := &etcdMonitorObjects{}
-	if err := loadEtcdMonitorObjects(objs, nil); err != nil {
+	objs := &bpf.EtcdMonitorObjects{}
+	if err := bpf.LoadEtcdMonitorObjects(objs, nil); err != nil {
 		return fmt.Errorf("loading eBPF objects: %w", err)
 	}
 

@@ -12,6 +12,7 @@ import (
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/yairfalse/tapio/pkg/collectors"
+	"github.com/yairfalse/tapio/pkg/collectors/systemd/bpf"
 )
 
 // SystemdEvent represents a systemd event from eBPF
@@ -28,7 +29,7 @@ type SystemdEvent struct {
 // Collector implements minimal systemd monitoring via eBPF
 type Collector struct {
 	name    string
-	objs    *systemdMonitorObjects
+	objs    *bpf.SystemdMonitorObjects
 	links   []link.Link
 	reader  *ringbuf.Reader
 	events  chan collectors.RawEvent
@@ -66,13 +67,8 @@ func (c *Collector) Start(ctx context.Context) error {
 	// Start eBPF monitoring if enabled
 	if c.config.EnableEBPF {
 		// Load eBPF program
-		spec, err := loadSystemdMonitor()
-		if err != nil {
-			return fmt.Errorf("failed to load eBPF spec: %w", err)
-		}
-
-		c.objs = &systemdMonitorObjects{}
-		if err := spec.LoadAndAssign(c.objs, nil); err != nil {
+		c.objs = &bpf.SystemdMonitorObjects{}
+		if err := bpf.LoadSystemdMonitorObjects(c.objs, nil); err != nil {
 			return fmt.Errorf("failed to load eBPF objects: %w", err)
 		}
 

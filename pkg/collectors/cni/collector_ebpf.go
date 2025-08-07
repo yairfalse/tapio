@@ -12,23 +12,16 @@ import (
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
+	"github.com/yairfalse/tapio/pkg/collectors/cni/bpf"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target amd64,arm64 cniMonitor ./bpf/cni_monitor.c
 
-// cniEvent represents a network event from eBPF
-type cniEvent struct {
-	Timestamp uint64
-	PID       uint32
-	Netns     uint32
-	EventType uint32
-	Comm      [16]byte
-	Data      [64]byte
-}
+// cniEvent is defined in types.go
 
 // eBPF components
 type ebpfState struct {
-	objs   *cniMonitorObjects
+	objs   *bpf.CniMonitorObjects
 	links  []link.Link
 	reader *ringbuf.Reader
 }
@@ -41,8 +34,8 @@ func (c *Collector) startEBPF() error {
 	}
 
 	// Load eBPF objects
-	objs := &cniMonitorObjects{}
-	if err := loadCniMonitorObjects(objs, nil); err != nil {
+	objs := &bpf.CniMonitorObjects{}
+	if err := bpf.LoadCniMonitorObjects(objs, nil); err != nil {
 		return fmt.Errorf("loading eBPF objects: %w", err)
 	}
 

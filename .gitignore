@@ -11,6 +11,8 @@ tapio-*
 !tapio-*.go
 server-example
 pattern-tester
+correlation-service
+transformer
 
 # Test binary, built with `go test -c`
 *.test

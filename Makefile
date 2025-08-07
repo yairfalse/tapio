@@ -33,7 +33,7 @@ generate-ebpf: ## Generate eBPF programs
 	@cd pkg/collectors/etcd && go generate ./...
 	@echo "$(GREEN)✅ eBPF programs generated!$(NC)"
 
-build: proto generate-ebpf ## Build all binaries (includes proto generation)
+build: generate-ebpf ## Build all binaries
 	@echo "$(BLUE)🔨 Building binaries...$(NC)"
 	@mkdir -p bin
 	@CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/tapio-collector ./cmd/tapio-collector
@@ -165,45 +165,6 @@ dev-setup: ## Setup local development environment
 skaffold-dev: ## Start Skaffold development (hot-reload)
 	@echo "$(BLUE)🔥 Starting Skaffold hot-reload development...$(NC)"
 	@skaffold dev --port-forward
-
-##@ Protobuf Generation
-
-proto: proto-install proto-generate ## Generate protobuf code
-
-proto-install: ## Install protobuf tools
-	@echo "$(BLUE)🔧 Installing protobuf tools...$(NC)"
-	@if ! which buf > /dev/null; then \
-		echo "Installing buf..."; \
-		go install github.com/bufbuild/buf/cmd/buf@latest; \
-	fi
-	@if ! which protoc-gen-go > /dev/null; then \
-		echo "Installing protoc-gen-go..."; \
-		go install google.golang.org/protobuf/cmd/protoc-gen-go@latest; \
-	fi
-	@if ! which protoc-gen-go-grpc > /dev/null; then \
-		echo "Installing protoc-gen-go-grpc..."; \
-		go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest; \
-	fi
-	@if ! which protoc-gen-grpc-gateway > /dev/null; then \
-		echo "Installing protoc-gen-grpc-gateway..."; \
-		go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest; \
-	fi
-	@if ! which protoc-gen-openapiv2 > /dev/null; then \
-		echo "Installing protoc-gen-openapiv2..."; \
-		go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@latest; \
-	fi
-	@echo "$(GREEN)✅ Protobuf tools installed$(NC)"
-
-proto-generate: ## Generate protobuf code
-	@echo "$(BLUE)📝 Generating protobuf code...$(NC)"
-	@mkdir -p proto/gen
-	@cd proto && $(GOBIN)/buf generate
-	@echo "$(GREEN)✅ Protobuf code generated$(NC)"
-
-proto-lint: ## Lint protobuf files
-	@echo "$(BLUE)🔍 Linting protobuf files...$(NC)"
-	@cd proto && buf lint
-	@echo "$(GREEN)✅ Protobuf lint passed$(NC)"
 
 ##@ Utilities
 

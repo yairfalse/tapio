@@ -29,6 +29,11 @@ func Register(name string, factory CollectorFactory) {
 	factories[name] = factory
 }
 
+// MustRegister registers a collector factory and panics on error
+func MustRegister(name string, factory CollectorFactory) {
+	Register(name, factory)
+}
+
 // CreateCollector creates a collector instance by name
 func CreateCollector(name string, config map[string]interface{}) (collectors.Collector, error) {
 	mu.RLock()
