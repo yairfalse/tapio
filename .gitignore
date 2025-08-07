@@ -13,6 +13,7 @@ server-example
 pattern-tester
 correlation-service
 transformer
+collectors
 
 # Test binary, built with `go test -c`
 *.test
