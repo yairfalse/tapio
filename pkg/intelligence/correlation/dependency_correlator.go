@@ -948,86 +948,117 @@ func (d *DependencyCorrelator) checkServiceExistence(record *GraphRecord, servic
 func (d *DependencyCorrelator) analyzePodAvailability(record *GraphRecord, serviceName, namespace string, event *domain.UnifiedEvent) []aggregator.Finding {
 	pods, err := record.GetNodes("pods")
 	if err != nil || len(pods) == 0 {
-		return []aggregator.Finding{{
-			ID:         fmt.Sprintf("service-no-pods-%s", serviceName),
-			Type:       "service_no_endpoints",
-			Severity:   aggregator.SeverityCritical,
-			Confidence: 0.90,
-			Message:    fmt.Sprintf("Service %s has no running pods", serviceName),
-			Evidence: aggregator.Evidence{
-				Events: []domain.UnifiedEvent{*event},
-				GraphPaths: []aggregator.GraphPath{{
-					Nodes: []aggregator.GraphNode{{
-						ID:   serviceName,
-						Type: "Service",
-						Labels: map[string]string{
-							"name":      serviceName,
-							"namespace": namespace,
-						},
-					}},
-				}},
-			},
-			Impact: aggregator.Impact{
-				Scope:       "service",
-				Resources:   []string{serviceName},
-				UserImpact:  "Service has no endpoints",
-				Degradation: NoPodsAvailableMsg,
-			},
-			Timestamp: time.Now(),
-		}}
+		return []aggregator.Finding{d.createNoPodsFinding(serviceName, namespace, event)}
 	}
 
-	// Analyze pod health
-	readyPods := 0
-	failedPods := 0
+	podStats := d.analyzePodHealth(pods)
+	return d.createAvailabilityFindings(podStats, serviceName, event)
+}
+
+// PodHealthStats holds pod health statistics
+type PodHealthStats struct {
+	ReadyPods  int
+	FailedPods int
+	TotalPods  int
+}
+
+// analyzePodHealth analyzes health of pods
+func (d *DependencyCorrelator) analyzePodHealth(pods []GraphNode) PodHealthStats {
+	stats := PodHealthStats{TotalPods: len(pods)}
 
 	for _, pod := range pods {
 		if pod.Properties.Ready {
-			readyPods++
+			stats.ReadyPods++
 		} else {
-			failedPods++
+			stats.FailedPods++
 		}
 	}
 
+	return stats
+}
+
+// createNoPodsFinding creates finding when service has no pods
+func (d *DependencyCorrelator) createNoPodsFinding(serviceName, namespace string, event *domain.UnifiedEvent) aggregator.Finding {
+	return aggregator.Finding{
+		ID:         fmt.Sprintf("service-no-pods-%s", serviceName),
+		Type:       "service_no_endpoints",
+		Severity:   aggregator.SeverityCritical,
+		Confidence: 0.90,
+		Message:    fmt.Sprintf("Service %s has no running pods", serviceName),
+		Evidence: aggregator.Evidence{
+			Events: []domain.UnifiedEvent{*event},
+			GraphPaths: []aggregator.GraphPath{{
+				Nodes: []aggregator.GraphNode{{
+					ID:   serviceName,
+					Type: "Service",
+					Labels: map[string]string{
+						"name":      serviceName,
+						"namespace": namespace,
+					},
+				}},
+			}},
+		},
+		Impact: aggregator.Impact{
+			Scope:       "service",
+			Resources:   []string{serviceName},
+			UserImpact:  "Service has no endpoints",
+			Degradation: NoPodsAvailableMsg,
+		},
+		Timestamp: time.Now(),
+	}
+}
+
+// createAvailabilityFindings creates findings based on pod availability
+func (d *DependencyCorrelator) createAvailabilityFindings(stats PodHealthStats, serviceName string, event *domain.UnifiedEvent) []aggregator.Finding {
 	var findings []aggregator.Finding
 
-	if readyPods == 0 && failedPods > 0 {
-		findings = append(findings, aggregator.Finding{
-			ID:         fmt.Sprintf("service-pods-failed-%s", serviceName),
-			Type:       "service_endpoints_failed",
-			Severity:   aggregator.SeverityCritical,
-			Confidence: 0.85,
-			Message:    fmt.Sprintf("Service %s has %d failed pods, 0 ready", serviceName, failedPods),
-			Evidence: aggregator.Evidence{
-				Events: []domain.UnifiedEvent{*event},
-			},
-			Impact: aggregator.Impact{
-				Scope:       "service",
-				Resources:   []string{serviceName},
-				UserImpact:  "Service unavailable due to pod failures",
-				Degradation: AllPodsFailedMsg,
-			},
-			Timestamp: time.Now(),
-		})
-	} else if readyPods < len(pods)/2 {
-		findings = append(findings, aggregator.Finding{
-			ID:         fmt.Sprintf("service-pods-degraded-%s", serviceName),
-			Type:       "service_endpoints_degraded",
-			Severity:   aggregator.SeverityHigh,
-			Confidence: 0.75,
-			Message:    fmt.Sprintf("Service %s has only %d/%d pods ready", serviceName, readyPods, len(pods)),
-			Evidence: aggregator.Evidence{
-				Events: []domain.UnifiedEvent{*event},
-			},
-			Impact: aggregator.Impact{
-				Scope:       "service",
-				Resources:   []string{serviceName},
-				UserImpact:  "Service degraded due to pod failures",
-				Degradation: fmt.Sprintf(ReducedCapacityFmt, (readyPods*100)/len(pods)),
-			},
-			Timestamp: time.Now(),
-		})
+	if stats.ReadyPods == 0 && stats.FailedPods > 0 {
+		findings = append(findings, d.createAllPodsFailedFinding(stats, serviceName, event))
+	} else if stats.ReadyPods < stats.TotalPods/2 {
+		findings = append(findings, d.createDegradedServiceFinding(stats, serviceName, event))
 	}
 
 	return findings
+}
+
+// createAllPodsFailedFinding creates finding when all pods are failed
+func (d *DependencyCorrelator) createAllPodsFailedFinding(stats PodHealthStats, serviceName string, event *domain.UnifiedEvent) aggregator.Finding {
+	return aggregator.Finding{
+		ID:         fmt.Sprintf("service-pods-failed-%s", serviceName),
+		Type:       "service_endpoints_failed",
+		Severity:   aggregator.SeverityCritical,
+		Confidence: 0.85,
+		Message:    fmt.Sprintf("Service %s has %d failed pods, 0 ready", serviceName, stats.FailedPods),
+		Evidence: aggregator.Evidence{
+			Events: []domain.UnifiedEvent{*event},
+		},
+		Impact: aggregator.Impact{
+			Scope:       "service",
+			Resources:   []string{serviceName},
+			UserImpact:  "Service unavailable due to pod failures",
+			Degradation: AllPodsFailedMsg,
+		},
+		Timestamp: time.Now(),
+	}
+}
+
+// createDegradedServiceFinding creates finding when service is degraded
+func (d *DependencyCorrelator) createDegradedServiceFinding(stats PodHealthStats, serviceName string, event *domain.UnifiedEvent) aggregator.Finding {
+	return aggregator.Finding{
+		ID:         fmt.Sprintf("service-pods-degraded-%s", serviceName),
+		Type:       "service_endpoints_degraded",
+		Severity:   aggregator.SeverityHigh,
+		Confidence: 0.75,
+		Message:    fmt.Sprintf("Service %s has only %d/%d pods ready", serviceName, stats.ReadyPods, stats.TotalPods),
+		Evidence: aggregator.Evidence{
+			Events: []domain.UnifiedEvent{*event},
+		},
+		Impact: aggregator.Impact{
+			Scope:       "service",
+			Resources:   []string{serviceName},
+			UserImpact:  "Service degraded due to pod failures",
+			Degradation: fmt.Sprintf(ReducedCapacityFmt, (stats.ReadyPods*100)/stats.TotalPods),
+		},
+		Timestamp: time.Now(),
+	}
 }

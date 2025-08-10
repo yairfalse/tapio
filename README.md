@@ -30,14 +30,14 @@ graph TD
         end
         
         subgraph "Level 1: K8s Collectors"
-            K[Kernel/eBPF]
-            S[Systemd]
-            DNS[DNS]
-            KA[KubeAPI Server]
-            KL[Kubelet]
-            CRI[Container Runtime]
-            CNI[CNI Plugins]
-            E[etcd]
+            K["Kernel/eBPF"]
+            S["Systemd"]
+            DNS["DNS"]
+            KA["KubeAPI Server"]
+            KL["Kubelet"]
+            CRI["Container Runtime"]
+            CNI["CNI Plugins"]
+            E["etcd"]
             K --> D
             S --> D
             DNS --> D
@@ -49,10 +49,10 @@ graph TD
         end
         
         subgraph "Level 2: Intelligence"
-            CE[Correlation Engine]
-            TC[Temporal Correlator]
-            SC[Sequence Correlator]
-            DC[Dependency Correlator]
+            CE["Correlation Engine"]
+            TC["Temporal Correlator"]
+            SC["Sequence Correlator"]
+            DC["Dependency Correlator"]
             D --> CE
             CE --> TC
             CE --> SC
@@ -60,8 +60,8 @@ graph TD
         end
         
         subgraph "Level 3: Integrations"
-            NATS[NATS Publisher]
-            NEO[Neo4j Storage]
+            NATS["NATS Publisher"]
+            NEO["Neo4j Storage"]
             CE --> NATS
             CE --> NEO
         end

@@ -94,7 +94,7 @@ func (p *PerformanceCorrelator) Process(ctx context.Context, event *domain.Unifi
 	return nil, nil
 }
 
-// CPU Throttling often leads to cascade failures
+// handleCPUThrottling analyzes CPU throttling that often leads to cascade failures
 func (p *PerformanceCorrelator) handleCPUThrottling(ctx context.Context, event *domain.UnifiedEvent) ([]*CorrelationResult, error) {
 	podKey := p.getPodKey(event)
 	cascadeEvents := p.detectCPUCascade(podKey)
@@ -312,7 +312,7 @@ func (p *PerformanceCorrelator) handleMemoryPressure(ctx context.Context, event 
 	return []*CorrelationResult{result}, nil
 }
 
-// Crash loop analysis
+// handleCrashLoop analyzes crash loop patterns
 func (p *PerformanceCorrelator) handleCrashLoop(ctx context.Context, event *domain.UnifiedEvent) ([]*CorrelationResult, error) {
 	crashInfo := p.extractCrashInfo(event)
 	recentEvents := p.findCrashRelatedEvents(crashInfo.PodKey)

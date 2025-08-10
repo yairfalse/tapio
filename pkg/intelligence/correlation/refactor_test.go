@@ -188,11 +188,11 @@ func TestRefactoredPerformanceMethods(t *testing.T) {
 func TestLineCount(t *testing.T) {
 	// This is a meta-test to ensure our refactoring meets the requirements
 	// The actual line counting would be done by a linter or static analysis tool
-	
+
 	// List of refactored functions that must be under 50 lines
 	refactoredFunctions := []string{
 		"analyzePodOwnership",
-		"queryPodOwnership", 
+		"queryPodOwnership",
 		"processPodOwnershipRecord",
 		"extractOwnershipInfo",
 		"handleCPUThrottling",

@@ -260,58 +260,67 @@ func (t *TemporalCorrelator) updatePatterns(event *domain.UnifiedEvent) {
 	t.patternsMu.Lock()
 	defer t.patternsMu.Unlock()
 
-	// Create pattern key
 	patternKey := fmt.Sprintf("%s-%s", event.Type, event.Source)
 
 	if pattern, exists := t.patterns[patternKey]; exists {
-		// Update existing pattern
-		timeDelta := event.Timestamp.Sub(pattern.LastEvent.Timestamp)
-
-		// Update moving average of time delta
-		pattern.TimeDelta = (pattern.TimeDelta*time.Duration(pattern.Occurrences) + timeDelta) / time.Duration(pattern.Occurrences+1)
-		pattern.Occurrences++
-		pattern.LastEvent = EventRef{
-			ID:        event.ID,
-			Type:      string(event.Type),
-			Timestamp: event.Timestamp,
-			Resource:  t.getResourceName(event),
-		}
-		pattern.LastSeen = time.Now()
-
-		// Update confidence based on consistency
-		pattern.Confidence = t.calculatePatternStability(pattern)
+		t.updateExistingPattern(pattern, event)
 	} else {
-		// Create new pattern if we have enough events
-		t.eventWindow.mu.RLock()
-		similarEvents := t.findSimilarEvents(event)
-		t.eventWindow.mu.RUnlock()
-
-		if len(similarEvents) >= t.config.MinOccurrences-1 {
-			t.patterns[patternKey] = &TemporalPattern{
-				ID: patternKey,
-				FirstEvent: EventRef{
-					ID:        event.ID,
-					Type:      string(event.Type),
-					Timestamp: event.Timestamp,
-					Resource:  t.getResourceName(event),
-				},
-				LastEvent: EventRef{
-					ID:        event.ID,
-					Type:      string(event.Type),
-					Timestamp: event.Timestamp,
-					Resource:  t.getResourceName(event),
-				},
-				Occurrences: 1,
-				TimeDelta:   0,
-				Confidence:  InitialConfidence, // Initial confidence
-				LastSeen:    time.Now(),
-			}
-		}
+		t.createNewPatternIfNeeded(patternKey, event)
 	}
 
 	// Limit number of patterns
 	if len(t.patterns) > t.config.MaxPatternsTracked {
 		t.evictOldestPattern()
+	}
+}
+
+// updateExistingPattern updates an existing temporal pattern
+func (t *TemporalCorrelator) updateExistingPattern(pattern *TemporalPattern, event *domain.UnifiedEvent) {
+	timeDelta := event.Timestamp.Sub(pattern.LastEvent.Timestamp)
+
+	// Update moving average of time delta
+	pattern.TimeDelta = (pattern.TimeDelta*time.Duration(pattern.Occurrences) + timeDelta) / time.Duration(pattern.Occurrences+1)
+	pattern.Occurrences++
+	pattern.LastEvent = t.createEventRef(event)
+	pattern.LastSeen = time.Now()
+
+	// Update confidence based on consistency
+	pattern.Confidence = t.calculatePatternStability(pattern)
+}
+
+// createNewPatternIfNeeded creates new pattern if enough similar events exist
+func (t *TemporalCorrelator) createNewPatternIfNeeded(patternKey string, event *domain.UnifiedEvent) {
+	t.eventWindow.mu.RLock()
+	similarEvents := t.findSimilarEvents(event)
+	t.eventWindow.mu.RUnlock()
+
+	if len(similarEvents) >= t.config.MinOccurrences-1 {
+		t.patterns[patternKey] = t.createTemporalPattern(patternKey, event)
+	}
+}
+
+// createEventRef creates an event reference from unified event
+func (t *TemporalCorrelator) createEventRef(event *domain.UnifiedEvent) EventRef {
+	return EventRef{
+		ID:        event.ID,
+		Type:      string(event.Type),
+		Timestamp: event.Timestamp,
+		Resource:  t.getResourceName(event),
+	}
+}
+
+// createTemporalPattern creates a new temporal pattern
+func (t *TemporalCorrelator) createTemporalPattern(patternKey string, event *domain.UnifiedEvent) *TemporalPattern {
+	eventRef := t.createEventRef(event)
+
+	return &TemporalPattern{
+		ID:          patternKey,
+		FirstEvent:  eventRef,
+		LastEvent:   eventRef,
+		Occurrences: 1,
+		TimeDelta:   0,
+		Confidence:  InitialConfidence,
+		LastSeen:    time.Now(),
 	}
 }
 
