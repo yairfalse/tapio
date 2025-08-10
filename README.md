@@ -24,54 +24,27 @@ Tapio is a correlation engine for observability data. It collects system events 
 ## Architecture Flow
 
 ```mermaid
-flowchart TD
-    %% Collectors (Level 1)
-    K[Kernel eBPF]
-    S[Systemd]
-    DNS[DNS]
-    CNI[CNI]
-    CRI[CRI]
-    Kubelet[Kubelet]
-    Kubeapi[KubeAPI]
-    Etcd[Etcd]
+graph TD
+    K[Kernel eBPF] --> NATS[NATS Streaming]
+    S[Systemd] --> NATS
+    DNS[DNS] --> NATS
+    CNI[CNI] --> NATS
+    CRI[CRI] --> NATS
+    Kubelet[Kubelet] --> NATS
+    Kubeapi[KubeAPI] --> NATS
+    Etcd[Etcd] --> NATS
     
-    %% Message Bus
-    NATS[NATS Streaming]
+    NATS --> D[Unified Event]
     
-    %% Domain (Level 0)
-    D[Unified Event]
+    D --> CE[Correlation Engine]
     
-    %% Intelligence (Level 2)
-    CE[Correlation Engine]
-    TC[Temporal]
-    SC[Sequence]
-    DC[Dependency]
-    OC[Ownership]
-    PC[Performance]
+    CE --> TC[Temporal]
+    CE --> SC[Sequence]
+    CE --> DC[Dependency]
+    CE --> OC[Ownership]
+    CE --> PC[Performance]
     
-    %% Storage (Level 3)
-    NEO[Neo4j Graph DB]
-    
-    %% Flow
-    K --> NATS
-    S --> NATS
-    DNS --> NATS
-    CNI --> NATS
-    CRI --> NATS
-    Kubelet --> NATS
-    Kubeapi --> NATS
-    Etcd --> NATS
-    
-    NATS --> D
-    D --> CE
-    
-    CE --> TC
-    CE --> SC
-    CE --> DC
-    CE --> OC
-    CE --> PC
-    
-    TC --> NEO
+    TC --> NEO[Neo4j Graph DB]
     SC --> NEO
     DC --> NEO
     OC --> NEO
