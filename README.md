@@ -24,60 +24,55 @@ Tapio is a correlation engine for observability data. It collects system events 
 
 ```mermaid
 graph TD
-    subgraph "Kubernetes Cluster"
-        subgraph "Level 1: K8s Collectors"
-            K["Kernel/eBPF"]
-            S["Systemd"]
-            DNS["DNS"]
-            KA["KubeAPI Server"]
-            KL["Kubelet"]
-            CRI["Container Runtime"]
-            CNI["CNI Plugins"]
-            E["etcd"]
-        end
-        
-        subgraph "Level 3: Integrations"
-            NATS["NATS Stream"]
-            TRANS["Event Transformer"]
-        end
-        
-        subgraph "Level 0: Domain"
-            D["domain.UnifiedEvent"]
-        end
-        
-        subgraph "Level 2: Intelligence"
-            CE["Correlation Engine"]
-            TC["Temporal Correlator"]
-            SC["Sequence Correlator"]
-            DC["Dependency Correlator"]
-        end
-        
-        subgraph "Level 3: Storage"
-            NEO["Neo4j Storage"]
-        end
-        
-        K -->|raw events| NATS
-        S -->|raw events| NATS
-        DNS -->|raw events| NATS
-        KA -->|raw events| NATS
-        KL -->|raw events| NATS
-        CRI -->|raw events| NATS
-        CNI -->|raw events| NATS
-        E -->|raw events| NATS
-        
-        NATS --> TRANS
-        TRANS -->|unified events| D
-        D --> CE
-        CE --> TC
-        CE --> SC
-        CE --> DC
-        CE --> NEO
+    subgraph Collectors["Level 1: K8s Collectors"]
+        K[Kernel/eBPF]
+        S[Systemd]
+        DNS[DNS]
+        KA[KubeAPI Server]
+        KL[Kubelet]
+        CRI[Container Runtime]
+        CNI[CNI Plugins]
+        E[etcd]
     end
     
-    subgraph "External Systems"
-        Graph[("Neo4j Graph DB")]
-        NEO --> Graph
+    subgraph Streaming["Level 3: Event Streaming"]
+        NATS[NATS Stream]
+        TRANS[Event Transformer]
     end
+    
+    subgraph Domain["Level 0: Domain"]
+        D[domain.UnifiedEvent]
+    end
+    
+    subgraph Intelligence["Level 2: Intelligence"]
+        CE[Correlation Engine]
+        TC[Temporal Correlator]
+        SC[Sequence Correlator]
+        DC[Dependency Correlator]
+    end
+    
+    subgraph Storage["Level 3: Storage"]
+        NEO[Neo4j Storage]
+        Graph[(Neo4j Graph DB)]
+    end
+    
+    K -->|raw events| NATS
+    S -->|raw events| NATS
+    DNS -->|raw events| NATS
+    KA -->|raw events| NATS
+    KL -->|raw events| NATS
+    CRI -->|raw events| NATS
+    CNI -->|raw events| NATS
+    E -->|raw events| NATS
+    
+    NATS --> TRANS
+    TRANS -->|unified events| D
+    D --> CE
+    CE --> TC
+    CE --> SC
+    CE --> DC
+    CE --> NEO
+    NEO --> Graph
 ```
 
 ## Architecture Rules
