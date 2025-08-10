@@ -4,9 +4,18 @@ Tapio is a correlation engine for observability data. It collects system events 
 
 ## What It Actually Does
 
+**Core Mission: Kubernetes Observability Intelligence**
+- Provides complete visibility into Kubernetes cluster behavior and dependencies
+- Correlates events across all layers: kernel, container runtime, kubelet, API server
+- Identifies root causes of failures through cross-component event analysis
+- Maps service dependencies and resource relationships automatically
+
+**Event Collection:**
 - Collects kernel events via eBPF (process, network, file operations)
-- Monitors systemd services and journals
-- Tracks DNS queries and responses
+- Monitors Kubernetes API server events (pods, services, deployments)
+- Tracks container runtime operations (CRI-O, containerd)
+- Monitors kubelet and CNI plugin activities
+- Captures DNS queries, etcd operations, and systemd services
 - Correlates events to find patterns and dependencies
 - Stores correlation results in Neo4j graph database
 - Streams events through NATS
@@ -15,42 +24,54 @@ Tapio is a correlation engine for observability data. It collects system events 
 
 ```mermaid
 graph TD
-    subgraph "Level 0: Domain"
-        D[domain.UnifiedEvent]
+    subgraph "Kubernetes Cluster"
+        subgraph "Level 0: Domain"
+            D[domain.UnifiedEvent]
+        end
+        
+        subgraph "Level 1: K8s Collectors"
+            K[Kernel/eBPF]
+            S[Systemd]
+            DNS[DNS]
+            KA[KubeAPI Server]
+            KL[Kubelet]
+            CRI[Container Runtime]
+            CNI[CNI Plugins]
+            E[etcd]
+            K --> D
+            S --> D
+            DNS --> D
+            KA --> D
+            KL --> D
+            CRI --> D
+            CNI --> D
+            E --> D
+        end
+        
+        subgraph "Level 2: Intelligence"
+            CE[Correlation Engine]
+            TC[Temporal Correlator]
+            SC[Sequence Correlator]
+            DC[Dependency Correlator]
+            D --> CE
+            CE --> TC
+            CE --> SC
+            CE --> DC
+        end
+        
+        subgraph "Level 3: Integrations"
+            NATS[NATS Publisher]
+            NEO[Neo4j Storage]
+            CE --> NATS
+            CE --> NEO
+        end
     end
     
-    subgraph "Level 1: Collectors"
-        K[Kernel/eBPF Collector]
-        S[Systemd Collector]
-        DNS[DNS Collector]
-        K --> D
-        S --> D
-        DNS --> D
-    end
-    
-    subgraph "Level 2: Intelligence"
-        CE[Correlation Engine]
-        TC[Temporal Correlator]
-        SC[Sequence Correlator]
-        DC[Dependency Correlator]
-        D --> CE
-        CE --> TC
-        CE --> SC
-        CE --> DC
-    end
-    
-    subgraph "Level 3: Integrations"
-        NATS[NATS Publisher]
-        NEO[Neo4j Storage]
-        CE --> NATS
-        CE --> NEO
-    end
-    
-    subgraph "Data Flow"
-        K -.->|syscalls| eBPF
-        S -.->|journal| systemd
-        DNS -.->|packets| network
-        NEO -.->|queries| Graph
+    subgraph "External Systems"
+        Graph[(Neo4j Graph DB)]
+        Stream[(NATS Streaming)]
+        NEO --> Graph
+        NATS --> Stream
     end
 ```
 
@@ -69,10 +90,15 @@ Components can ONLY import from lower levels. No exceptions.
 
 ## Implemented Components
 
-### Collectors (What's Actually Working)
+### Collectors (All Available)
 - **kernel**: eBPF programs for syscall monitoring (process exec, network, file ops)
-- **systemd**: Journal reader for service events
+- **systemd**: Journal reader for service events  
 - **dns**: eBPF-based DNS query/response capture
+- **kubeapi**: Kubernetes API server event monitoring (pods, services, deployments, network policies)
+- **kubelet**: Node-level container lifecycle and resource monitoring
+- **cri**: Container runtime interface monitoring (containerd, CRI-O operations)
+- **cni**: Container network interface plugin event tracking
+- **etcd**: Kubernetes datastore operation monitoring
 
 ### Correlation Engine
 Processes events and finds relationships:
@@ -182,10 +208,10 @@ From `CLAUDE.md` - these are enforced:
 
 ## Current Limitations
 
-- Kubernetes collectors (kubeapi, kubelet, cri) are defined but not fully implemented
 - Graph correlations require Neo4j to be running
 - eBPF collectors require root/CAP_BPF privileges
 - Only works on Linux (eBPF dependency)
+- Kubernetes collectors require appropriate cluster RBAC permissions
 
 ## Project Status
 
