@@ -25,10 +25,6 @@ Tapio is a correlation engine for observability data. It collects system events 
 ```mermaid
 graph TD
     subgraph "Kubernetes Cluster"
-        subgraph "Level 0: Domain"
-            D[domain.UnifiedEvent]
-        end
-        
         subgraph "Level 1: K8s Collectors"
             K["Kernel/eBPF"]
             S["Systemd"]
@@ -38,14 +34,15 @@ graph TD
             CRI["Container Runtime"]
             CNI["CNI Plugins"]
             E["etcd"]
-            K --> D
-            S --> D
-            DNS --> D
-            KA --> D
-            KL --> D
-            CRI --> D
-            CNI --> D
-            E --> D
+        end
+        
+        subgraph "Level 3: Integrations"
+            NATS["NATS Stream"]
+            TRANS["Event Transformer"]
+        end
+        
+        subgraph "Level 0: Domain"
+            D["domain.UnifiedEvent"]
         end
         
         subgraph "Level 2: Intelligence"
@@ -53,25 +50,33 @@ graph TD
             TC["Temporal Correlator"]
             SC["Sequence Correlator"]
             DC["Dependency Correlator"]
-            D --> CE
-            CE --> TC
-            CE --> SC
-            CE --> DC
         end
         
-        subgraph "Level 3: Integrations"
-            NATS["NATS Publisher"]
+        subgraph "Level 3: Storage"
             NEO["Neo4j Storage"]
-            CE --> NATS
-            CE --> NEO
         end
+        
+        K -->|raw events| NATS
+        S -->|raw events| NATS
+        DNS -->|raw events| NATS
+        KA -->|raw events| NATS
+        KL -->|raw events| NATS
+        CRI -->|raw events| NATS
+        CNI -->|raw events| NATS
+        E -->|raw events| NATS
+        
+        NATS --> TRANS
+        TRANS -->|unified events| D
+        D --> CE
+        CE --> TC
+        CE --> SC
+        CE --> DC
+        CE --> NEO
     end
     
     subgraph "External Systems"
-        Graph[(Neo4j Graph DB)]
-        Stream[(NATS Streaming)]
+        Graph[("Neo4j Graph DB")]
         NEO --> Graph
-        NATS --> Stream
     end
 ```
 
