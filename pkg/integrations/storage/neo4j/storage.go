@@ -262,7 +262,7 @@ func (s *Storage) GetRecent(ctx context.Context, limit int) ([]*correlation.Corr
 		"limit": limit,
 	}
 
-	records, err := s.client.ExecuteQuery(ctx, query, params)
+	records, err := s.client.ExecuteQueryLegacy(ctx, query, params)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +286,7 @@ func (s *Storage) GetByTraceID(ctx context.Context, traceID string) ([]*correlat
 		"traceId": traceID,
 	}
 
-	records, err := s.client.ExecuteQuery(ctx, query, params)
+	records, err := s.client.ExecuteQueryLegacy(ctx, query, params)
 	if err != nil {
 		return nil, err
 	}

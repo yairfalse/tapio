@@ -132,8 +132,13 @@ func (c *Client) CreateEvent(ctx context.Context, event *domain.UnifiedEvent) er
 	})
 }
 
-// CreateRelationship creates a relationship between nodes with safe parameterized queries
-func (c *Client) CreateRelationship(ctx context.Context, fromUID, toUID string, relType RelationType, properties map[string]interface{}) error {
+// CreateRelationship creates a relationship between nodes with typed properties
+func (c *Client) CreateRelationship(ctx context.Context, fromUID, toUID string, relType RelationType, properties RelationshipProperties) error {
+	return c.CreateRelationshipLegacy(ctx, fromUID, toUID, relType, relationshipPropertiesToMap(properties))
+}
+
+// CreateRelationshipLegacy creates a relationship with untyped properties (DEPRECATED)
+func (c *Client) CreateRelationshipLegacy(ctx context.Context, fromUID, toUID string, relType RelationType, properties map[string]interface{}) error {
 	// Validate relationship type
 	if !isValidRelationType(relType) {
 		return fmt.Errorf("invalid relationship type: %s", relType)

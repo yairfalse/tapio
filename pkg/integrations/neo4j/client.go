@@ -54,27 +54,29 @@ func (c *Client) Close(ctx context.Context) error {
 	return c.driver.Close(ctx)
 }
 
-// ExecuteQuery runs a Cypher query with parameters
-func (c *Client) ExecuteQuery(ctx context.Context, query string, params map[string]interface{}) ([]map[string]interface{}, error) {
+// ExecuteQuery runs a Cypher query with typed parameters
+func (c *Client) ExecuteQuery(ctx context.Context, query string, params QueryParams) (*QueryResult, error) {
 	session := c.driver.NewSession(ctx, neo4j.SessionConfig{
 		AccessMode:   neo4j.AccessModeRead,
 		DatabaseName: c.config.Database,
 	})
 	defer session.Close(ctx)
 
-	result, err := session.Run(ctx, query, params)
+	result, err := session.Run(ctx, query, params.ToMap())
 	if err != nil {
 		return nil, fmt.Errorf("failed to run query: %w", err)
 	}
 
-	var records []map[string]interface{}
+	var records []Record
 	for result.Next(ctx) {
-		record := make(map[string]interface{})
+		record := Record{
+			Values: make(map[string]interface{}),
+		}
 		values := result.Record().Values
 		keys := result.Record().Keys
 
 		for i, key := range keys {
-			record[key] = values[i]
+			record.Values[key] = values[i]
 		}
 		records = append(records, record)
 	}
@@ -83,10 +85,12 @@ func (c *Client) ExecuteQuery(ctx context.Context, query string, params map[stri
 		return nil, fmt.Errorf("query error: %w", err)
 	}
 
-	return records, nil
+	return &QueryResult{
+		Records: records,
+		Summary: Summary{}, // TODO: Extract from result summary
+	}, nil
 }
 
-// ExecuteWrite runs a write transaction
 func (c *Client) ExecuteWrite(ctx context.Context, fn func(tx neo4j.ManagedTransaction) error) error {
 	if c.driver == nil {
 		return fmt.Errorf("neo4j driver not initialized")
@@ -127,3 +131,38 @@ func (c *Client) CreateIndexes(ctx context.Context) error {
 
 	return nil
 }
+
+// ExecuteQueryLegacy provides backward compatibility for untyped queries
+// DEPRECATED: Use ExecuteQuery with QueryParams instead
+func (c *Client) ExecuteQueryLegacy(ctx context.Context, query string, params map[string]interface{}) ([]map[string]interface{}, error) {
+	session := c.driver.NewSession(ctx, neo4j.SessionConfig{
+		AccessMode:   neo4j.AccessModeRead,
+		DatabaseName: c.config.Database,
+	})
+	defer session.Close(ctx)
+
+	result, err := session.Run(ctx, query, params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run query: %w", err)
+	}
+
+	var records []map[string]interface{}
+	for result.Next(ctx) {
+		record := make(map[string]interface{})
+		values := result.Record().Values
+		keys := result.Record().Keys
+
+		for i, key := range keys {
+			record[key] = values[i]
+		}
+		records = append(records, record)
+	}
+
+	if err := result.Err(); err != nil {
+		return nil, fmt.Errorf("query error: %w", err)
+	}
+
+	return records, nil
+}
+
+

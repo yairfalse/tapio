@@ -27,6 +27,7 @@ type Record struct {
 	StringList []string `json:"string_list,omitempty"`
 
 	// Raw values for backward compatibility during migration
+	// DEPRECATED: Use typed fields instead
 	Values map[string]interface{} `json:"values,omitempty"`
 }
 
@@ -172,13 +173,14 @@ type RelationshipProperties struct {
 }
 
 // NodeProperties is a generic container for node properties
-// Used during migration from map[string]interface{}
+// DEPRECATED: Used during migration from map[string]interface{}
 type NodeProperties struct {
 	Type       string                 `json:"type"`
 	Properties map[string]interface{} `json:"properties"`
 }
 
 // WriteParams contains parameters for write operations
+// DEPRECATED: Use typed structs instead
 type WriteParams struct {
 	Node         interface{}            `json:"node,omitempty"`
 	Relationship *Relationship          `json:"relationship,omitempty"`
@@ -203,6 +205,7 @@ type QueryParams struct {
 	Offset int `json:"offset,omitempty"`
 
 	// Generic parameters for complex queries
+	// Only use for Neo4j driver compatibility
 	Custom map[string]interface{} `json:"custom,omitempty"`
 }
 
