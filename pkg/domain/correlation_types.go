@@ -185,3 +185,103 @@ type ContextCriteria struct {
 	Operator string      `json:"operator"` // "equals", "contains", "exists"
 	Value    interface{} `json:"value,omitempty"`
 }
+
+// Shared Intelligence Types (moved from aggregator to resolve circular dependency)
+
+// CorrelatorOutput represents standardized output from any correlator
+type CorrelatorOutput struct {
+	CorrelatorName    string
+	CorrelatorVersion string
+	Findings          []Finding
+	Context           map[string]string // Structured context, not interface{}
+	Confidence        float64
+	ProcessingTime    time.Duration
+	Timestamp         time.Time
+}
+
+// Finding represents a single insight from a correlator
+type Finding struct {
+	ID         string
+	Type       string
+	Severity   Severity
+	Confidence float64
+	Message    string
+	Evidence   Evidence
+	Impact     Impact
+	Timestamp  time.Time
+}
+
+// Evidence contains structured proof of a finding
+type Evidence struct {
+	Events     []UnifiedEvent
+	Metrics    []MetricPoint
+	Logs       []LogEntry
+	Traces     []TraceSpan
+	GraphPaths []GraphPath
+	Attributes map[string]string // Additional attributes for synthesis rules (strongly typed)
+}
+
+// MetricPoint represents a metric data point
+type MetricPoint struct {
+	Name      string
+	Value     float64
+	Timestamp time.Time
+	Labels    map[string]string
+}
+
+// LogEntry represents a log line
+type LogEntry struct {
+	Message   string
+	Level     string
+	Timestamp time.Time
+	Source    string
+}
+
+// TraceSpan represents a trace span
+type TraceSpan struct {
+	TraceID   string
+	SpanID    string
+	Operation string
+	Duration  time.Duration
+}
+
+// GraphPath represents a path in Neo4j
+type GraphPath struct {
+	Nodes []GraphNode
+	Edges []GraphEdge
+}
+
+// GraphNode represents a node in the graph
+type GraphNode struct {
+	ID     string
+	Type   string
+	Labels map[string]string
+}
+
+// GraphEdge represents an edge in the graph
+type GraphEdge struct {
+	From         string
+	To           string
+	Relationship string
+	Properties   map[string]string
+}
+
+// Impact describes the effect of a finding
+type Impact struct {
+	Scope       string
+	Resources   []string
+	Services    []string
+	UserImpact  string
+	Degradation string
+}
+
+// Severity levels
+type Severity string
+
+const (
+	SeverityCritical Severity = "critical"
+	SeverityHigh     Severity = "high"
+	SeverityMedium   Severity = "medium"
+	SeverityLow      Severity = "low"
+	SeverityInfo     Severity = "info"
+)

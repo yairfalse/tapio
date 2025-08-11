@@ -17,7 +17,7 @@ func TestEngine_HealthCheck(t *testing.T) {
 	t.Run("healthy engine", func(t *testing.T) {
 		config := DefaultConfig()
 		config.StorageWorkerCount = 2
-		
+
 		// Create engine with memory storage
 		storage := NewMemoryStorage(logger)
 		engine, err := NewEngine(logger, config, nil, storage)
@@ -66,7 +66,7 @@ func TestEngine_HealthCheck(t *testing.T) {
 	t.Run("stopped engine", func(t *testing.T) {
 		config := DefaultConfig()
 		config.StorageWorkerCount = 2
-		
+
 		storage := NewMemoryStorage(logger)
 		engine, err := NewEngine(logger, config, nil, storage)
 		require.NoError(t, err)
@@ -124,7 +124,7 @@ func TestEngine_HealthCheck(t *testing.T) {
 func TestEngine_IsHealthy(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	config := DefaultConfig()
-	
+
 	storage := NewMemoryStorage(logger)
 	engine, err := NewEngine(logger, config, nil, storage)
 	require.NoError(t, err)
@@ -151,7 +151,7 @@ func TestEngine_GetHealthStatus(t *testing.T) {
 	config := DefaultConfig()
 	config.EnabledCorrelators = []string{"temporal"}
 	config.StorageWorkerCount = 5
-	
+
 	storage := NewMemoryStorage(logger)
 	engine, err := NewEngine(logger, config, nil, storage)
 	require.NoError(t, err)
@@ -200,7 +200,7 @@ func TestEngine_GetHealthStatus(t *testing.T) {
 func TestEngine_GetHealthStatus_WithFailures(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	config := DefaultConfig()
-	
+
 	// Create mock storage that fails health check
 	mockStorage := &MockStorage{}
 	mockStorage.On("HealthCheck", context.Background()).Return(fmt.Errorf("connection lost"))

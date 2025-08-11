@@ -331,3 +331,35 @@ type CorrelatorInfo struct {
 	Enabled     bool
 	HealthCheck func(context.Context) error
 }
+
+// Missing interface types
+
+// Rule represents a single rule
+type Rule struct {
+	ID          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Type        string                 `json:"type"`
+	Description string                 `json:"description"`
+	Priority    int                    `json:"priority"`
+	Enabled     bool                   `json:"enabled"`
+	Conditions  []*RuleCondition       `json:"conditions"`
+	Actions     []*RuleAction          `json:"actions"`
+	Config      map[string]interface{} `json:"config,omitempty"`
+	CreatedAt   time.Time              `json:"created_at"`
+	UpdatedAt   time.Time              `json:"updated_at"`
+}
+
+// RuleCondition represents a rule condition
+type RuleCondition struct {
+	Field    string      `json:"field"`
+	Operator string      `json:"operator"` // "equals", "greater_than", "contains", etc.
+	Value    interface{} `json:"value"`
+	Required bool        `json:"required"`
+}
+
+// RuleAction represents a rule action
+type RuleAction struct {
+	Type        string                 `json:"type"`
+	Description string                 `json:"description"`
+	Parameters  map[string]interface{} `json:"parameters,omitempty"`
+}

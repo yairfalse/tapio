@@ -4,8 +4,8 @@ import (
 	"math"
 )
 
-// ConfidenceCalculator calculates aggregated confidence scores
-type ConfidenceCalculator struct {
+// LegacyConfidenceCalculator calculates aggregated confidence scores
+type LegacyConfidenceCalculator struct {
 	// Configuration for confidence calculation
 	agreementBoost     float64
 	patternMatchBoost  float64
@@ -14,8 +14,8 @@ type ConfidenceCalculator struct {
 }
 
 // NewConfidenceCalculator creates a new confidence calculator
-func NewConfidenceCalculator() *ConfidenceCalculator {
-	return &ConfidenceCalculator{
+func NewConfidenceCalculator() *LegacyConfidenceCalculator {
+	return &LegacyConfidenceCalculator{
 		agreementBoost:     0.2,  // 20% boost for agreement
 		patternMatchBoost:  0.1,  // 10% boost for pattern match
 		missingDataPenalty: 0.2,  // 20% penalty for missing data
@@ -24,7 +24,7 @@ func NewConfidenceCalculator() *ConfidenceCalculator {
 }
 
 // Calculate computes the final confidence score
-func (c *ConfidenceCalculator) Calculate(findings []Finding, patterns []Pattern, outputs []*CorrelatorOutput) float64 {
+func (c *LegacyConfidenceCalculator) Calculate(findings []Finding, patterns []Pattern, outputs []*CorrelatorOutput) float64 {
 	if len(findings) == 0 {
 		return 0.0
 	}
@@ -57,7 +57,7 @@ func (c *ConfidenceCalculator) Calculate(findings []Finding, patterns []Pattern,
 }
 
 // averageConfidence calculates the average confidence of findings
-func (c *ConfidenceCalculator) averageConfidence(findings []Finding) float64 {
+func (c *LegacyConfidenceCalculator) averageConfidence(findings []Finding) float64 {
 	if len(findings) == 0 {
 		return 0.0
 	}
@@ -70,7 +70,7 @@ func (c *ConfidenceCalculator) averageConfidence(findings []Finding) float64 {
 }
 
 // hasAgreement checks if multiple correlators agree
-func (c *ConfidenceCalculator) hasAgreement(outputs []*CorrelatorOutput) bool {
+func (c *LegacyConfidenceCalculator) hasAgreement(outputs []*CorrelatorOutput) bool {
 	if len(outputs) < 2 {
 		return false
 	}
@@ -94,7 +94,7 @@ func (c *ConfidenceCalculator) hasAgreement(outputs []*CorrelatorOutput) bool {
 }
 
 // hasMissingData checks if we're missing critical data
-func (c *ConfidenceCalculator) hasMissingData(outputs []*CorrelatorOutput) bool {
+func (c *LegacyConfidenceCalculator) hasMissingData(outputs []*CorrelatorOutput) bool {
 	// Check if any correlator returned no findings
 	emptyCount := 0
 	for _, output := range outputs {
@@ -108,7 +108,7 @@ func (c *ConfidenceCalculator) hasMissingData(outputs []*CorrelatorOutput) bool 
 }
 
 // hasConflicts checks if correlators have conflicting findings
-func (c *ConfidenceCalculator) hasConflicts(outputs []*CorrelatorOutput) bool {
+func (c *LegacyConfidenceCalculator) hasConflicts(outputs []*CorrelatorOutput) bool {
 	// Simple conflict detection: different root causes for same resource
 	resources := make(map[string][]string)
 
@@ -137,7 +137,7 @@ func (c *ConfidenceCalculator) hasConflicts(outputs []*CorrelatorOutput) bool {
 }
 
 // applyCorrelatorWeights adjusts confidence based on correlator accuracy
-func (c *ConfidenceCalculator) applyCorrelatorWeights(baseConfidence float64, outputs []*CorrelatorOutput) float64 {
+func (c *LegacyConfidenceCalculator) applyCorrelatorWeights(baseConfidence float64, outputs []*CorrelatorOutput) float64 {
 	// For now, return base confidence
 	// In real implementation, this would use correlator accuracy scores
 	return baseConfidence
