@@ -19,7 +19,7 @@ import (
 	"go.uber.org/zap"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target amd64,arm64 storagemonitor ./bpf_src/storage_monitor_premium.c -- -I../bpf_common
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target amd64,arm64 storagemonitor ./bpf_src/storage_monitor.c -- -I../bpf_common
 
 // eBPF components - Linux-specific
 type ebpfComponents struct {
@@ -88,9 +88,9 @@ func (c *Collector) attachVFSProbes(state *ebpfComponents) error {
 	return nil
 }
 
-// attachVFSProbe attaches tracepoints for the premium collector
+// attachVFSProbe attaches tracepoints for the storage collector
 func (c *Collector) attachVFSProbe(state *ebpfComponents, probeType VFSProbeType) error {
-	// Premium collector uses tracepoints, not kprobes
+	// The collector uses tracepoints, not kprobes
 	// The eBPF programs are already attached via tracepoints in the SEC() definitions
 	// No manual attachment needed for tracepoints
 	return nil

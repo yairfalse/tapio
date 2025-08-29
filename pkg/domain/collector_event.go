@@ -84,6 +84,14 @@ const (
 	EventTypeKubeletContainerTerminated CollectorEventType = "kubelet.container.terminated"
 	EventTypeKubeletCrashLoop           CollectorEventType = "kubelet.container.crash_loop"
 	EventTypeKubeletPodNotReady         CollectorEventType = "kubelet.pod.not_ready"
+
+	// Resource starvation events
+	EventTypeResourceStarvation CollectorEventType = "resource.starvation"
+	EventTypeSchedulingDelay    CollectorEventType = "kernel.scheduling_delay"
+	EventTypeCFSThrottle        CollectorEventType = "kernel.cfs_throttle"
+	EventTypePriorityInversion  CollectorEventType = "kernel.priority_inversion"
+	EventTypeCoreMigration      CollectorEventType = "kernel.core_migration"
+	EventTypeNoisyNeighbor      CollectorEventType = "kernel.noisy_neighbor"
 )
 
 // CollectorEvent represents a fully contextualized event from any collector
@@ -144,6 +152,9 @@ type EventDataContainer struct {
 
 	// Systemd data
 	Systemd *SystemdData `json:"systemd,omitempty"`
+
+	// Resource starvation data
+	ResourceStarvation *ResourceStarvationData `json:"resource_starvation,omitempty"`
 
 	// OpenTelemetry data
 	OTELSpan   *OTELSpanData   `json:"otel_span,omitempty"`
@@ -560,6 +571,48 @@ type SystemdData struct {
 	Hostname  string `json:"hostname,omitempty"`
 	MachineID string `json:"machine_id,omitempty"`
 	BootID    string `json:"boot_id,omitempty"`
+}
+
+// ResourceStarvationData represents resource starvation event data
+type ResourceStarvationData struct {
+	// Event type and timing
+	StarvationType string  `json:"starvation_type"` // "scheduling_delay", "cfs_throttle", etc.
+	WaitTimeMS     float64 `json:"wait_time_ms"`    // How long the process waited
+	RunTimeMS      float64 `json:"run_time_ms"`     // How long it ran after waiting
+	CPUCore        uint32  `json:"cpu_core"`        // Which CPU core
+
+	// The victim (who got starved)
+	VictimPID      uint32 `json:"victim_pid"`
+	VictimTGID     uint32 `json:"victim_tgid"`
+	VictimCommand  string `json:"victim_command"`
+	VictimPriority int32  `json:"victim_priority"`
+	VictimPolicy   string `json:"victim_policy"` // SCHED_NORMAL, etc.
+
+	// The culprit (who caused starvation, if known)
+	CulpritPID     uint32  `json:"culprit_pid,omitempty"`
+	CulpritTGID    uint32  `json:"culprit_tgid,omitempty"`
+	CulpritCommand string  `json:"culprit_command,omitempty"`
+	CulpritRuntime float64 `json:"culprit_runtime_ms,omitempty"`
+
+	// Throttling information (for CFS throttling)
+	ThrottleTimeMS   float64 `json:"throttle_time_ms,omitempty"`
+	PercentThrottled float64 `json:"percent_throttled,omitempty"`
+	ThrottleCount    uint32  `json:"throttle_count,omitempty"`
+
+	// Impact metrics
+	SeverityLevel      string  `json:"severity_level"`       // "minor", "moderate", "severe", "critical"
+	EstimatedLatencyMS float64 `json:"estimated_latency_ms"` // User-visible impact estimate
+	WaitToRunRatio     float64 `json:"wait_to_run_ratio"`    // Wait time / run time
+
+	// Pattern information
+	PatternType        string  `json:"pattern_type,omitempty"`        // "throttle", "noisy_neighbor", etc.
+	PatternDescription string  `json:"pattern_description,omitempty"` // Human-readable description
+	PatternConfidence  float64 `json:"pattern_confidence,omitempty"`  // 0-1 confidence score
+	IsRecurring        bool    `json:"is_recurring,omitempty"`        // Whether this pattern repeats
+
+	// Cgroup context
+	VictimCgroupID  uint64 `json:"victim_cgroup_id,omitempty"`
+	CulpritCgroupID uint64 `json:"culprit_cgroup_id,omitempty"`
 }
 
 // RawData holds raw binary/unknown data (fallback only)

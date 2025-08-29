@@ -149,7 +149,7 @@ func (c *Collector) readEBPFEvents() {
 	}
 
 	c.logger.Info("Starting eBPF event reader")
-	
+
 	for {
 		select {
 		case <-c.ctx.Done():
@@ -197,7 +197,7 @@ func (c *Collector) processRawEvent(data []byte) {
 	// Parse the memory event
 	var event MemoryEvent
 	buf := bytes.NewBuffer(data)
-	
+
 	// Read fields in order matching C struct
 	binary.Read(buf, binary.LittleEndian, &event.Timestamp)
 	binary.Read(buf, binary.LittleEndian, &event.EventType)

@@ -343,3 +343,86 @@ func (p *CollectorOrchestrator) GetHealthStatus() map[string]CollectorHealthStat
 
 	return status
 }
+
+// CollectorFactory creates a collector from YAML configuration
+type CollectorFactory func(name string, config *CollectorConfigData, logger *zap.Logger) (collectors.Collector, error)
+
+// Global collector factory registry
+var collectorFactories = sync.Map{}
+
+// RegisterCollectorFactory registers a collector factory for automatic YAML instantiation
+func RegisterCollectorFactory(collectorType string, factory CollectorFactory) {
+	collectorFactories.Store(collectorType, factory)
+}
+
+// RegisterCollectorsFromYAML automatically registers all enabled collectors from YAML config
+func (p *CollectorOrchestrator) RegisterCollectorsFromYAML(config *YAMLConfig, logger *zap.Logger) error {
+	if p.ctx != nil {
+		return fmt.Errorf("cannot register collectors after orchestrator started")
+	}
+
+	registered := []string{}
+
+	// Iterate through all collectors in YAML config
+	for collectorType, collectorConfig := range config.Collectors {
+		if !collectorConfig.Enabled {
+			logger.Debug("Collector disabled in config", zap.String("type", collectorType))
+			continue
+		}
+
+		// Look up factory for this collector type
+		factoryInterface, exists := collectorFactories.Load(collectorType)
+		if !exists {
+			logger.Error("No factory registered for collector type",
+				zap.String("type", collectorType),
+				zap.Strings("available", getRegisteredCollectorTypes()))
+			continue
+		}
+
+		factory, ok := factoryInterface.(CollectorFactory)
+		if !ok {
+			logger.Error("Invalid factory type for collector", zap.String("type", collectorType))
+			continue
+		}
+
+		// Create collector instance using factory
+		collector, err := factory(collectorType, &collectorConfig.Config, logger)
+		if err != nil {
+			logger.Error("Failed to create collector from factory",
+				zap.String("type", collectorType),
+				zap.Error(err))
+			continue
+		}
+
+		// Register with orchestrator
+		if err := p.RegisterCollector(collectorType, collector); err != nil {
+			logger.Error("Failed to register collector with orchestrator",
+				zap.String("type", collectorType),
+				zap.Error(err))
+			continue
+		}
+
+		registered = append(registered, collectorType)
+	}
+
+	if len(registered) == 0 {
+		return fmt.Errorf("no collectors were successfully registered")
+	}
+
+	logger.Info("Successfully registered collectors from YAML",
+		zap.Strings("collectors", registered))
+
+	return nil
+}
+
+// getRegisteredCollectorTypes returns list of available collector types
+func getRegisteredCollectorTypes() []string {
+	var types []string
+	collectorFactories.Range(func(key, value interface{}) bool {
+		if typeStr, ok := key.(string); ok {
+			types = append(types, typeStr)
+		}
+		return true
+	})
+	return types
+}

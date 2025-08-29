@@ -250,7 +250,8 @@ check_network_filter(__u32 src_ip, __u32 dst_ip, __u16 src_port, __u16 dst_port,
     value = bpf_map_lookup_elem(&network_filters_v4, &key);
     if (value) {
         /* Update hit count and timestamp */
-        __sync_fetch_and_add(&value->hit_count, 1);
+        __u64 old_count = value->hit_count;
+        value->hit_count = old_count + 1;
         value->timestamp = get_current_timestamp();
         return value;
     }
@@ -261,7 +262,8 @@ check_network_filter(__u32 src_ip, __u32 dst_ip, __u16 src_port, __u16 dst_port,
     
     value = bpf_map_lookup_elem(&network_filters_v4, &key);
     if (value) {
-        __sync_fetch_and_add(&value->hit_count, 1);
+        __u64 old_count = value->hit_count;
+        value->hit_count = old_count + 1;
         value->timestamp = get_current_timestamp();
         return value;
     }
@@ -274,7 +276,8 @@ check_network_filter(__u32 src_ip, __u32 dst_ip, __u16 src_port, __u16 dst_port,
     key.ip = src_ip;
     value = bpf_map_lookup_elem(&network_filters_v4, &key);
     if (value) {
-        __sync_fetch_and_add(&value->hit_count, 1);
+        __u64 old_count = value->hit_count;
+        value->hit_count = old_count + 1;
         value->timestamp = get_current_timestamp();
         return value;
     }
@@ -283,7 +286,8 @@ check_network_filter(__u32 src_ip, __u32 dst_ip, __u16 src_port, __u16 dst_port,
     key.ip = dst_ip;
     value = bpf_map_lookup_elem(&network_filters_v4, &key);
     if (value) {
-        __sync_fetch_and_add(&value->hit_count, 1);
+        __u64 old_count = value->hit_count;
+        value->hit_count = old_count + 1;
         value->timestamp = get_current_timestamp();
         return value;
     }
@@ -319,7 +323,8 @@ check_process_filter(__u32 pid, __u32 ppid, __u32 uid, __u32 gid,
     
     value = bpf_map_lookup_elem(&process_filters, &key);
     if (value) {
-        __sync_fetch_and_add(&value->hit_count, 1);
+        __u64 old_count = value->hit_count;
+        value->hit_count = old_count + 1;
         value->timestamp = get_current_timestamp();
         return value;
     }
@@ -328,7 +333,8 @@ check_process_filter(__u32 pid, __u32 ppid, __u32 uid, __u32 gid,
     key.pid = 0; /* Any PID */
     value = bpf_map_lookup_elem(&process_filters, &key);
     if (value) {
-        __sync_fetch_and_add(&value->hit_count, 1);
+        __u64 old_count = value->hit_count;
+        value->hit_count = old_count + 1;
         value->timestamp = get_current_timestamp();
         return value;
     }
@@ -341,7 +347,8 @@ check_process_filter(__u32 pid, __u32 ppid, __u32 uid, __u32 gid,
     
     value = bpf_map_lookup_elem(&process_filters, &key);
     if (value) {
-        __sync_fetch_and_add(&value->hit_count, 1);
+        __u64 old_count = value->hit_count;
+        value->hit_count = old_count + 1;
         value->timestamp = get_current_timestamp();
         return value;
     }
@@ -369,7 +376,8 @@ check_namespace_filter(__u64 netns_inode, const char *ns_name, const char *pod_n
     
     value = bpf_map_lookup_elem(&namespace_filters, &key);
     if (value) {
-        __sync_fetch_and_add(&value->hit_count, 1);
+        __u64 old_count = value->hit_count;
+        value->hit_count = old_count + 1;
         value->timestamp = get_current_timestamp();
         return value;
     }
@@ -378,7 +386,8 @@ check_namespace_filter(__u64 netns_inode, const char *ns_name, const char *pod_n
     key.pod_hash = 0;
     value = bpf_map_lookup_elem(&namespace_filters, &key);
     if (value) {
-        __sync_fetch_and_add(&value->hit_count, 1);
+        __u64 old_count = value->hit_count;
+        value->hit_count = old_count + 1;
         value->timestamp = get_current_timestamp();
         return value;
     }
@@ -472,10 +481,14 @@ static __always_inline void update_bpf_statistics(__u64 events_received,
     
     stats = bpf_map_lookup_elem(&bpf_statistics, &key);
     if (stats) {
-        __sync_fetch_and_add(&stats->events_received, events_received);
-        __sync_fetch_and_add(&stats->events_processed, events_processed);
-        __sync_fetch_and_add(&stats->events_dropped, events_dropped);
-        __sync_fetch_and_add(&stats->processing_time_ns, processing_time_ns);
+        __u64 old_val = stats->events_received;
+        stats->events_received = old_val + events_received;
+        old_val = stats->events_processed;
+        stats->events_processed = old_val + events_processed;
+        old_val = stats->events_dropped;
+        stats->events_dropped = old_val + events_dropped;
+        old_val = stats->processing_time_ns;
+        stats->processing_time_ns = old_val + processing_time_ns;
         stats->last_update = get_current_timestamp();
     }
 }

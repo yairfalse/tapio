@@ -54,7 +54,8 @@ struct { \
         __u32 __key = probe_id; \
         struct bpf_statistics *__stats = bpf_map_lookup_elem(stats_map, &__key); \
         if (__stats) { \
-            __sync_fetch_and_add(&__stats->invocations, 1); \
+            __u64 __old_val = __stats->invocations; \
+            __stats->invocations = __old_val + 1; \
             __stats->last_update_ns = bpf_ktime_get_ns(); \
         } \
     } while(0)
@@ -66,11 +67,14 @@ struct { \
         struct bpf_statistics *__stats = bpf_map_lookup_elem(stats_map, &__key); \
         if (__stats) { \
             if (error_type == STATS_EVENT_FILTERED) { \
-                __sync_fetch_and_add(&__stats->filter_misses, 1); \
+                __u64 __old_val = __stats->filter_misses; \
+                __stats->filter_misses = __old_val + 1; \
             } else if (error_type == STATS_EVENT_SAMPLED) { \
-                __sync_fetch_and_add(&__stats->filter_misses, 1); \
+                __u64 __old_val = __stats->filter_misses; \
+                __stats->filter_misses = __old_val + 1; \
             } else { \
-                __sync_fetch_and_add(&__stats->errors, 1); \
+                __u64 __old_val = __stats->errors; \
+                __stats->errors = __old_val + 1; \
             } \
             __stats->last_update_ns = bpf_ktime_get_ns(); \
         } \
@@ -82,9 +86,12 @@ struct { \
         __u32 __key = probe_id; \
         struct bpf_statistics *__stats = bpf_map_lookup_elem(stats_map, &__key); \
         if (__stats) { \
-            __sync_fetch_and_add(&__stats->events_sent, 1); \
-            __sync_fetch_and_add(&__stats->bytes_processed, bytes); \
-            __sync_fetch_and_add(&__stats->filter_hits, 1); \
+            __u64 __old_val = __stats->events_sent; \
+            __stats->events_sent = __old_val + 1; \
+            __old_val = __stats->bytes_processed; \
+            __stats->bytes_processed = __old_val + bytes; \
+            __old_val = __stats->filter_hits; \
+            __stats->filter_hits = __old_val + 1; \
             __stats->last_update_ns = bpf_ktime_get_ns(); \
         } \
     } while(0)
@@ -95,7 +102,8 @@ static __always_inline void update_probe_stats_invocation()
     __u32 key = 0;
     struct bpf_statistics *stats = bpf_map_lookup_elem(&probe_stats, &key);
     if (stats) {
-        __sync_fetch_and_add(&stats->invocations, 1);
+        __u64 old_val = stats->invocations;
+        stats->invocations = old_val + 1;
         stats->last_update_ns = bpf_ktime_get_ns();
     }
 }
@@ -105,8 +113,10 @@ static __always_inline void update_probe_stats_event_sent(__u64 bytes)
     __u32 key = 0;
     struct bpf_statistics *stats = bpf_map_lookup_elem(&probe_stats, &key);
     if (stats) {
-        __sync_fetch_and_add(&stats->events_sent, 1);
-        __sync_fetch_and_add(&stats->bytes_processed, bytes);
+        __u64 old_val = stats->events_sent;
+        stats->events_sent = old_val + 1;
+        old_val = stats->bytes_processed;
+        stats->bytes_processed = old_val + bytes;
         stats->last_update_ns = bpf_ktime_get_ns();
     }
 }
@@ -116,7 +126,8 @@ static __always_inline void update_probe_stats_event_dropped()
     __u32 key = 0;
     struct bpf_statistics *stats = bpf_map_lookup_elem(&probe_stats, &key);
     if (stats) {
-        __sync_fetch_and_add(&stats->events_dropped, 1);
+        __u64 old_val = stats->events_dropped;
+        stats->events_dropped = old_val + 1;
         stats->last_update_ns = bpf_ktime_get_ns();
     }
 }
@@ -126,7 +137,8 @@ static __always_inline void update_probe_stats_error()
     __u32 key = 0;
     struct bpf_statistics *stats = bpf_map_lookup_elem(&probe_stats, &key);
     if (stats) {
-        __sync_fetch_and_add(&stats->errors, 1);
+        __u64 old_val = stats->errors;
+        stats->errors = old_val + 1;
         stats->last_update_ns = bpf_ktime_get_ns();
     }
 }
@@ -137,9 +149,11 @@ static __always_inline void update_probe_stats_filter(__u8 passed)
     struct bpf_statistics *stats = bpf_map_lookup_elem(&probe_stats, &key);
     if (stats) {
         if (passed) {
-            __sync_fetch_and_add(&stats->filter_hits, 1);
+            __u64 old_val = stats->filter_hits;
+            stats->filter_hits = old_val + 1;
         } else {
-            __sync_fetch_and_add(&stats->filter_misses, 1);
+            __u64 old_val = stats->filter_misses;
+            stats->filter_misses = old_val + 1;
         }
         stats->last_update_ns = bpf_ktime_get_ns();
     }
