@@ -62,6 +62,8 @@ type FilterConditions struct {
 	SourcePort int    `yaml:"source_port,omitempty"`
 	DestPort   int    `yaml:"dest_port,omitempty"`
 	Protocol   string `yaml:"protocol,omitempty"`
+	SourceIP   string `yaml:"source_ip,omitempty"`
+	DestIP     string `yaml:"dest_ip,omitempty"`
 
 	// DNS filters
 	DomainPattern string `yaml:"domain_pattern,omitempty"`

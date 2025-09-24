@@ -50,22 +50,22 @@ func (fc *FilterCompiler) CompileRule(rule *FilterRule) (FilterFunc, error) {
 // compileSeverityFilter creates a filter for severity levels
 func (fc *FilterCompiler) compileSeverityFilter(rule *FilterRule) (FilterFunc, error) {
 	severityOrder := map[string]int{
-		"DEBUG":    0,
-		"INFO":     1,
-		"WARNING":  2,
-		"ERROR":    3,
-		"CRITICAL": 4,
+		"debug":    0,
+		"info":     1,
+		"warning":  2,
+		"error":    3,
+		"critical": 4,
 	}
 
-	minLevel := rule.Conditions.MinSeverity
-	maxLevel := rule.Conditions.MaxSeverity
+	minLevel := strings.ToLower(rule.Conditions.MinSeverity)
+	maxLevel := strings.ToLower(rule.Conditions.MaxSeverity)
 
 	if minLevel == "" && maxLevel == "" {
 		return nil, fmt.Errorf("severity filter requires min_severity or max_severity")
 	}
 
 	return func(event *domain.CollectorEvent) bool {
-		eventLevel, exists := severityOrder[string(event.Severity)]
+		eventLevel, exists := severityOrder[strings.ToLower(string(event.Severity))]
 		if !exists {
 			return false
 		}
@@ -131,6 +131,20 @@ func (fc *FilterCompiler) compileNetworkFilter(rule *FilterRule) (FilterFunc, er
 		// Check protocol filter
 		if rule.Conditions.Protocol != "" {
 			if !strings.EqualFold(event.EventData.Network.Protocol, rule.Conditions.Protocol) {
+				return false
+			}
+		}
+
+		// Check source IP filter
+		if rule.Conditions.SourceIP != "" {
+			if event.EventData.Network.SrcIP != rule.Conditions.SourceIP {
+				return false
+			}
+		}
+
+		// Check destination IP filter
+		if rule.Conditions.DestIP != "" {
+			if event.EventData.Network.DstIP != rule.Conditions.DestIP {
 				return false
 			}
 		}

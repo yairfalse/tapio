@@ -32,6 +32,10 @@ func TestFilterManager_NetworkFilter(t *testing.T) {
 	err := fm.LoadFromFile("testdata/filters.yaml")
 	require.NoError(t, err)
 
+	// Check what filters were loaded
+	stats := fm.GetStatistics()
+	t.Logf("Loaded filters: deny=%d, allow=%d", stats.DenyFilters, stats.AllowFilters)
+
 	// Test localhost traffic is filtered
 	event := &domain.CollectorEvent{
 		EventID:   "test-1",
@@ -252,27 +256,27 @@ func TestFilterCompiler_SeverityFilter(t *testing.T) {
 	rule := &FilterRule{
 		Name: "test_severity",
 		Type: "severity",
-		Condition: FilterCondition{
-			MinSeverity: "warning",
+		Conditions: FilterConditions{
+			MinSeverity: "WARNING",
 		},
 	}
 
 	filter, err := fc.CompileRule(rule)
 	require.NoError(t, err)
 
-	// Debug event should be filtered
+	// Debug event should be filtered (below minimum severity)
 	debugEvent := &domain.CollectorEvent{
 		EventID:  "test-1",
 		Severity: domain.EventSeverityDebug,
 	}
-	assert.True(t, filter(debugEvent)) // Returns true to DROP
+	assert.False(t, filter(debugEvent)) // Returns false - doesn't meet min severity
 
-	// Warning event should pass
+	// Warning event should pass (meets minimum severity)
 	warningEvent := &domain.CollectorEvent{
 		EventID:  "test-2",
 		Severity: domain.EventSeverityWarning,
 	}
-	assert.False(t, filter(warningEvent)) // Returns false to KEEP
+	assert.True(t, filter(warningEvent)) // Returns true - meets min severity
 }
 
 func BenchmarkFilterManager_ShouldAllow(b *testing.B) {
