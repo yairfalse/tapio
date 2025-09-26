@@ -5,6 +5,7 @@ package containerruntime
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"time"
@@ -64,6 +65,12 @@ func (c *Observer) startEBPF() error {
 	}
 	state.reader = reader
 
+	// Initialize container runtime client
+	if err := c.initializeRuntimeClient(); err != nil {
+		// Log warning but don't fail - we can still track some events
+		c.logger.Warn("Failed to initialize container runtime client", zap.Error(err))
+	}
+
 	c.logger.Info("eBPF programs attached",
 		zap.Int("attached_programs", len(state.links)))
 
@@ -94,26 +101,26 @@ func (c *Observer) loadEBPFPrograms() error {
 func (c *Observer) attachPrograms() error {
 	state := c.ebpfState.(*ebpfStateImpl)
 
-	// Attach OOM kill tracepoint
+	// Attach OOM kill kprobe (monitors oom_kill_process kernel function)
 	if c.config.EnableOOMKill {
-		oomLink, err := link.Tracepoint("oom", "mark_victim", state.objs.TraceOomKill, nil)
+		oomLink, err := link.Kprobe("oom_kill_process", state.objs.TraceOomKill, nil)
 		if err != nil {
-			return fmt.Errorf("attaching OOM kill tracepoint: %w", err)
+			return fmt.Errorf("attaching OOM kill kprobe: %w", err)
 		}
 		state.links = append(state.links, oomLink)
 	}
 
-	// Attach memory pressure tracepoint
+	// Attach memory pressure kprobe (monitors mem_cgroup_out_of_memory)
 	if c.config.EnableMemoryPressure {
-		memLink, err := link.Tracepoint("vmscan", "mm_vmscan_memcg_reclaim_begin", state.objs.TraceMemcgOom, nil)
+		memLink, err := link.Kprobe("mem_cgroup_out_of_memory", state.objs.TraceMemcgOom, nil)
 		if err != nil {
-			c.logger.Warn("Failed to attach memory pressure tracepoint", zap.Error(err))
+			c.logger.Warn("Failed to attach memory pressure kprobe", zap.Error(err))
 		} else {
 			state.links = append(state.links, memLink)
 		}
 	}
 
-	// Attach process exit tracepoint
+	// Attach process exit tracepoint (this is actually a tracepoint, not kprobe)
 	if c.config.EnableProcessExit {
 		exitLink, err := link.Tracepoint("sched", "sched_process_exit", state.objs.TraceProcessExit, nil)
 		if err != nil {
@@ -122,7 +129,7 @@ func (c *Observer) attachPrograms() error {
 		state.links = append(state.links, exitLink)
 	}
 
-	// Attach process fork tracepoint
+	// Attach process fork tracepoint (this is actually a tracepoint, not kprobe)
 	if c.config.EnableProcessFork {
 		forkLink, err := link.Tracepoint("sched", "sched_process_fork", state.objs.TraceProcessFork, nil)
 		if err != nil {
@@ -137,6 +144,14 @@ func (c *Observer) attachPrograms() error {
 
 // cleanup releases all eBPF resources
 func (c *Observer) cleanup() {
+	// Close runtime client
+	if c.runtimeClient != nil {
+		if err := c.runtimeClient.Close(); err != nil {
+			c.logger.Warn("Failed to close runtime client", zap.Error(err))
+		}
+		c.runtimeClient = nil
+	}
+
 	if c.ebpfState == nil {
 		return
 	}
@@ -334,4 +349,201 @@ func (c *Observer) collectMetrics() {
 			c.logger.Debug("Collecting Container Runtime metrics")
 		}
 	}
+}
+
+// initializeRuntimeClient initializes the container runtime client
+func (c *Observer) initializeRuntimeClient() error {
+	client, err := AutoDetectRuntime()
+	if err != nil {
+		return fmt.Errorf("failed to detect container runtime: %w", err)
+	}
+
+	// Set logger if it's a Docker client
+	if dockerClient, ok := client.(*DockerClient); ok {
+		dockerClient.SetLogger(c.logger)
+	}
+
+	c.runtimeClient = client
+
+	// Do initial container discovery
+	ctx := c.LifecycleManager.Context()
+	containers, err := client.ListContainers(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list containers: %w", err)
+	}
+
+	if len(containers) > 0 {
+		c.logger.Info("Discovered running containers",
+			zap.Int("count", len(containers)))
+
+		// Update eBPF maps with discovered containers
+		if err := c.updateEBPFMapsWithContainers(containers); err != nil {
+			c.logger.Warn("Failed to update eBPF maps", zap.Error(err))
+		}
+	}
+
+	// Start watching for container events
+	go c.watchContainerEvents(ctx)
+
+	return nil
+}
+
+// updateEBPFMapsWithContainers updates eBPF maps with container information
+func (c *Observer) updateEBPFMapsWithContainers(containers []Container) error {
+	state := c.ebpfState.(*ebpfStateImpl)
+	if state == nil || state.objs == nil {
+		return fmt.Errorf("eBPF not initialized")
+	}
+
+	// Update container_map (PID -> metadata)
+	containerMap := state.objs.ContainerMap
+	if containerMap == nil {
+		return fmt.Errorf("container_map not found")
+	}
+
+	// Update cgroup_map (cgroup ID -> metadata)
+	cgroupMap := state.objs.CgroupMap
+	if cgroupMap == nil {
+		return fmt.Errorf("cgroup_map not found")
+	}
+
+	for _, container := range containers {
+		// Create BPF metadata struct
+		var metadata BPFContainerMetadata
+
+		// Copy container ID (convert string to [64]int8)
+		containerIDBytes := []byte(container.ID)
+		for i := 0; i < len(containerIDBytes) && i < 64; i++ {
+			metadata.ContainerID[i] = int8(containerIDBytes[i])
+		}
+
+		// Set cgroup ID
+		metadata.CgroupID = container.CgroupID
+
+		// Update PID -> metadata mapping
+		if container.PID > 0 {
+			pid := container.PID
+			if err := containerMap.Update(&pid, &metadata, 0); err != nil {
+				c.logger.Warn("Failed to update container_map",
+					zap.Uint32("pid", pid),
+					zap.String("container_id", container.ID),
+					zap.Error(err))
+			} else {
+				c.logger.Debug("Registered container PID in eBPF map",
+					zap.Uint32("pid", pid),
+					zap.String("container_id", container.ID))
+			}
+		}
+
+		// Update cgroup ID -> metadata mapping
+		if container.CgroupID > 0 {
+			cgroupID := container.CgroupID
+			if err := cgroupMap.Update(&cgroupID, &metadata, 0); err != nil {
+				c.logger.Warn("Failed to update cgroup_map",
+					zap.Uint64("cgroup_id", cgroupID),
+					zap.String("container_id", container.ID),
+					zap.Error(err))
+			}
+		}
+
+		// Update local cache
+		c.cacheMu.Lock()
+		c.containerCache[container.ID] = &ContainerMetadata{
+			ContainerID: container.ID,
+			CgroupID:    container.CgroupID,
+			Namespace:   container.Namespace,
+			LastSeen:    time.Now(),
+		}
+		c.cacheMu.Unlock()
+	}
+
+	return nil
+}
+
+// watchContainerEvents watches for container lifecycle events
+func (c *Observer) watchContainerEvents(ctx context.Context) {
+	if c.runtimeClient == nil {
+		return
+	}
+
+	eventCh, err := c.runtimeClient.WatchEvents(ctx)
+	if err != nil {
+		c.logger.Error("Failed to start watching container events", zap.Error(err))
+		return
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case event, ok := <-eventCh:
+			if !ok {
+				c.logger.Info("Container event channel closed")
+				return
+			}
+
+			c.handleContainerEvent(event)
+		}
+	}
+}
+
+// handleContainerEvent handles a container lifecycle event
+func (c *Observer) handleContainerEvent(event ContainerEvent) {
+	c.logger.Debug("Container event received",
+		zap.String("type", string(event.Type)),
+		zap.String("container_id", event.Container.ID),
+		zap.Uint32("pid", event.Container.PID))
+
+	switch event.Type {
+	case ContainerEventStart:
+		// Add container to maps
+		if err := c.updateEBPFMapsWithContainers([]Container{event.Container}); err != nil {
+			c.logger.Warn("Failed to add container to eBPF maps",
+				zap.String("container_id", event.Container.ID),
+				zap.Error(err))
+		}
+
+	case ContainerEventStop, ContainerEventDie:
+		// Remove container from maps
+		c.removeContainerFromMaps(event.Container)
+
+	case ContainerEventOOM:
+		// OOM events are tracked by eBPF directly
+		c.logger.Info("Container OOM event",
+			zap.String("container_id", event.Container.ID))
+	}
+}
+
+// removeContainerFromMaps removes a container from eBPF maps
+func (c *Observer) removeContainerFromMaps(container Container) {
+	state := c.ebpfState.(*ebpfStateImpl)
+	if state == nil || state.objs == nil {
+		return
+	}
+
+	// Remove from PID map
+	if container.PID > 0 && state.objs.ContainerMap != nil {
+		pid := container.PID
+		if err := state.objs.ContainerMap.Delete(&pid); err != nil {
+			c.logger.Debug("Failed to remove PID from container_map",
+				zap.Uint32("pid", pid),
+				zap.Error(err))
+		}
+	}
+
+	// Remove from cgroup map
+	if container.CgroupID > 0 && state.objs.CgroupMap != nil {
+		cgroupID := container.CgroupID
+		if err := state.objs.CgroupMap.Delete(&cgroupID); err != nil {
+			c.logger.Debug("Failed to remove cgroup from cgroup_map",
+				zap.Uint64("cgroup_id", cgroupID),
+				zap.Error(err))
+		}
+	}
+
+	// Remove from local cache
+	c.cacheMu.Lock()
+	delete(c.containerCache, container.ID)
+	c.cacheMu.Unlock()
 }

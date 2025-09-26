@@ -66,7 +66,8 @@ type FilterConditions struct {
 	DestIP     string `yaml:"dest_ip,omitempty"`
 
 	// DNS filters
-	DomainPattern string `yaml:"domain_pattern,omitempty"`
+	DomainPattern string   `yaml:"domain_pattern,omitempty"`
+	QueryTypes    []string `yaml:"query_types,omitempty"`
 
 	// HTTP filters
 	StatusCode int    `yaml:"status_code,omitempty"`

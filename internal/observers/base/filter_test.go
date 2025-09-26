@@ -44,8 +44,8 @@ func TestFilterManager_NetworkFilter(t *testing.T) {
 		Source:    "test",
 		EventData: domain.EventDataContainer{
 			Network: &domain.NetworkData{
-				SourceIP: "127.0.0.1",
-				DestIP:   "192.168.1.1",
+				SrcIP: "127.0.0.1",
+				DstIP: "192.168.1.1",
 			},
 		},
 	}
@@ -55,7 +55,7 @@ func TestFilterManager_NetworkFilter(t *testing.T) {
 	assert.Equal(t, int64(1), fm.eventsDenied.Load())
 
 	// Non-localhost traffic should pass
-	event.EventData.Network.SourceIP = "192.168.1.1"
+	event.EventData.Network.SrcIP = "192.168.1.1"
 	assert.True(t, fm.ShouldAllow(event))
 }
 
@@ -153,11 +153,12 @@ func TestFilterManager_ConfigReload(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "filters.yaml")
 
 	initialConfig := `
-version: "1.0"
-deny:
+version: 1
+deny_filters:
   - name: "test_filter"
     type: "severity"
-    condition:
+    enabled: true
+    conditions:
       min_severity: "warning"
 `
 	err := os.WriteFile(configPath, []byte(initialConfig), 0644)
@@ -177,15 +178,17 @@ deny:
 
 	// Update config
 	updatedConfig := `
-version: "2.0"
-deny:
+version: 2
+deny_filters:
   - name: "test_filter"
     type: "severity"
-    condition:
+    enabled: true
+    conditions:
       min_severity: "error"
   - name: "another_filter"
     type: "event_type"
-    condition:
+    enabled: true
+    conditions:
       types: ["test.event"]
 `
 	err = os.WriteFile(configPath, []byte(updatedConfig), 0644)
@@ -217,8 +220,8 @@ func TestBaseObserver_WithFilters(t *testing.T) {
 		Source:    "test",
 		EventData: domain.EventDataContainer{
 			Network: &domain.NetworkData{
-				SourceIP: "127.0.0.1", // Localhost
-				DestIP:   "8.8.8.8",
+				SrcIP: "127.0.0.1", // Localhost
+				DstIP: "8.8.8.8",
 			},
 		},
 	}
@@ -228,19 +231,19 @@ func TestBaseObserver_WithFilters(t *testing.T) {
 	assert.Equal(t, int64(1), bc.eventsFiltered.Load())
 
 	// Non-localhost should pass
-	networkEvent.EventData.Network.SourceIP = "192.168.1.1"
+	networkEvent.EventData.Network.SrcIP = "192.168.1.1"
 	assert.True(t, bc.ShouldProcess(networkEvent))
 
 	// Add runtime filter
 	bc.AddDenyFilter("high_ports", func(event *domain.CollectorEvent) bool {
 		if netData, ok := event.GetNetworkData(); ok {
-			return netData.SourcePort > 10000 || netData.DestPort > 10000
+			return netData.SrcPort > 10000 || netData.DstPort > 10000
 		}
 		return false
 	})
 
 	// Test runtime filter
-	networkEvent.EventData.Network.SourcePort = 50000
+	networkEvent.EventData.Network.SrcPort = 50000
 	assert.False(t, bc.ShouldProcess(networkEvent))
 
 	// Get statistics
@@ -258,6 +261,7 @@ func TestFilterCompiler_SeverityFilter(t *testing.T) {
 		Type: "severity",
 		Conditions: FilterConditions{
 			MinSeverity: "WARNING",
+
 		},
 	}
 

@@ -104,14 +104,15 @@ func (fc *FilterCompiler) compileEventTypeFilter(rule *FilterRule) (FilterFunc, 
 // compileNetworkFilter creates a filter for network events
 func (fc *FilterCompiler) compileNetworkFilter(rule *FilterRule) (FilterFunc, error) {
 	return func(event *domain.CollectorEvent) bool {
-		// Check if it's a network event
-		if string(event.Type) != "network" {
-			return false
+		// Check if it's a network event (support both "network" and "kernel.network")
+		eventType := string(event.Type)
+		if eventType != "network" && eventType != "kernel.network" {
+			return false // Not a network event, don't match this filter
 		}
 
 		// Check if network data exists
 		if event.EventData.Network == nil {
-			return false
+			return false // No network data, don't match
 		}
 
 		// Check source port filter
@@ -166,24 +167,36 @@ func (fc *FilterCompiler) compileDNSFilter(rule *FilterRule) (FilterFunc, error)
 
 	return func(event *domain.CollectorEvent) bool {
 		// Check if it's a DNS event
-		if string(event.Type) != "dns" {
-			return false
+		eventType := string(event.Type)
+		if eventType != "dns" && eventType != "kernel.dns" && eventType != "network.dns" {
+			return false // Not a DNS event, don't match this filter
 		}
 
 		// Check if DNS data exists
 		if event.EventData.DNS == nil {
-			return false
+			return false // No DNS data, don't match
 		}
+
+		// For deny filters: return true if ANY condition matches (to trigger deny)
 
 		// Check domain pattern
-		if domainRegex != nil {
-			if event.EventData.DNS.QueryName != "" {
-				return domainRegex.MatchString(event.EventData.DNS.QueryName)
+		if domainRegex != nil && event.EventData.DNS.QueryName != "" {
+			if domainRegex.MatchString(event.EventData.DNS.QueryName) {
+				return true // Domain matches, trigger deny
 			}
-			return false
 		}
 
-		return true
+		// Check query types filter
+		if len(rule.Conditions.QueryTypes) > 0 {
+			for _, queryType := range rule.Conditions.QueryTypes {
+				if strings.EqualFold(event.EventData.DNS.QueryType, queryType) {
+					return true // Query type matches, trigger deny
+				}
+			}
+		}
+
+		// No conditions matched, don't trigger this filter
+		return false
 	}, nil
 }
 
@@ -191,7 +204,8 @@ func (fc *FilterCompiler) compileDNSFilter(rule *FilterRule) (FilterFunc, error)
 func (fc *FilterCompiler) compileHTTPFilter(rule *FilterRule) (FilterFunc, error) {
 	return func(event *domain.CollectorEvent) bool {
 		// Check if it's an HTTP event
-		if string(event.Type) != "http" {
+		eventType := string(event.Type)
+		if eventType != "http" && eventType != "kernel.http" && eventType != "network.http" {
 			return false
 		}
 
